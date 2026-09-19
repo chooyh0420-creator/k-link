@@ -307,13 +307,13 @@ main{padding:20px; max-width:1500px; margin:0 auto}
 .memo-divider{display:flex; align-items:center; gap:7px; margin:14px 0 9px}
 .memo-divider span{font-size:11px; color:var(--ink-3); font-weight:700; white-space:nowrap}
 .memo-divider i{flex:1; height:1px; background:var(--line-soft)}
-/* 방문 현황 — 캘린더 상단에 붙는 작은 알약 모양 표시 */
-.visit-pill{display:flex; align-items:center; gap:12px; background:var(--surface-2);
-  border:1px solid var(--line-soft); border-radius:99px; padding:6px 16px 6px 14px}
-.visit-pill .vp-item{display:flex; align-items:baseline; gap:6px; white-space:nowrap}
-.visit-pill .vp-item i{font-style:normal; font-size:10px; font-weight:800; color:var(--ink-3); letter-spacing:.04em}
-.visit-pill .vp-item b{font-size:15px; font-weight:900; color:var(--brand); font-variant-numeric:tabular-nums; letter-spacing:-.3px}
-.visit-pill .vp-sep{width:1px; height:13px; background:var(--line-strong)}
+/* 방문 현황 — 상단 학교 헤더의 화면색/밝게/시제품 표시 자리에 학생용일 때만 붙는 알약 표시 */
+.visit-pill{display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.26); border-radius:99px; padding:5px 14px}
+.visit-pill .vp-item{display:flex; align-items:baseline; gap:5px; white-space:nowrap}
+.visit-pill .vp-item i{font-style:normal; font-size:10px; font-weight:800; color:rgba(255,255,255,.66); letter-spacing:.04em}
+.visit-pill .vp-item b{font-size:14px; font-weight:900; color:#fff; font-variant-numeric:tabular-nums; letter-spacing:-.2px}
+.visit-pill .vp-sep{width:1px; height:12px; background:rgba(255,255,255,.3)}
 /* 공개 토글 칩 */
 .pubchip{border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-3);
   font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:99px; white-space:nowrap;
@@ -698,11 +698,16 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
         <b>K-Link</b><span class="sub">공동업무 연결체계</span>
       </div>
       <div class="right">
-        <div class="who"><label for="palSel">화면 색</label>
+        <div class="visit-pill" id="visitPill">
+          <span class="vp-item"><i>TODAY</i><b id="visitToday">0</b></span>
+          <span class="vp-sep"></span>
+          <span class="vp-item"><i>TOTAL</i><b id="visitTotal">0</b></span>
+        </div>
+        <div class="who" id="paletteWrap"><label for="palSel">화면 색</label>
           <select id="palSel"></select></div>
         <button class="themebtn" id="themeBtn" title="밝게 / 어둡게 전환">밝게</button>
         <div class="who" id="whoWrap"><label for="deptSel">내 부서</label><select id="deptSel"></select></div>
-        <span class="demo">시제품 · 가상 데이터</span>
+        <span class="demo" id="demoLabel">시제품 · 가상 데이터</span>
       </div>
     </div>
   </header>
@@ -917,11 +922,6 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
         <button class="today-btn" id="sTodayBtn">오늘</button>
         <div class="legend" id="sCalLegend"></div>
         <div class="updated-at" id="sUpdatedAt" title="장학금 지급일 자료를 학생용 캘린더에 마지막으로 올린 시점입니다."></div>
-        <div class="visit-pill" id="visitPill">
-          <span class="vp-item"><i>TODAY</i><b id="visitToday">0</b></span>
-          <span class="vp-sep"></span>
-          <span class="vp-item"><i>TOTAL</i><b id="visitTotal">0</b></span>
-        </div>
       </div>
       <div class="hint">표시된 일정은 예시입니다. 실제 일정은 학교 공지사항을 확인해주세요.</div>
       <div class="dow"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
@@ -2359,6 +2359,10 @@ function setMode(m){
   $('#v-staff').hidden = (m!=='staff') || locked;
   $('#v-student').hidden = m!=='student';
   $('#whoWrap').style.display=(m==='staff'&&!locked)?'':'none';
+  $('#paletteWrap').style.display=(m==='student')?'none':'';
+  $('#themeBtn').style.display=(m==='student')?'none':'';
+  $('#demoLabel').style.display=(m==='student')?'none':'';
+  $('#visitPill').style.display=(m==='student')?'':'none';
   $('#stripNote').textContent = locked ? '코드를 입력하면 열립니다.' : NOTE[m];
   $('#tabBar').innerHTML = locked ? '' : tabsHtml(m, TABS[m][0][0]);
   if(!locked) TABS[m].forEach(([id],i)=>{$('#'+id).hidden=i!==0});

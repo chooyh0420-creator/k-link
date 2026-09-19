@@ -703,11 +703,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
           <span class="vp-sep"></span>
           <span class="vp-item"><i>TOTAL</i><b id="visitTotal">0</b></span>
         </div>
-        <div class="who" id="paletteWrap"><label for="palSel">화면 색</label>
-          <select id="palSel"></select></div>
-        <button class="themebtn" id="themeBtn" title="밝게 / 어둡게 전환">밝게</button>
         <div class="who" id="whoWrap"><label for="deptSel">내 부서</label><select id="deptSel"></select></div>
-        <span class="demo" id="demoLabel">시제품 · 가상 데이터</span>
       </div>
     </div>
   </header>
@@ -1623,7 +1619,6 @@ function openNewQuick(startIso, endIso, anchorEl){
 function closeQuickpop(){
   $('#quickpop').hidden=true;
   if(DRAFT){ DRAFT=null; drawStaffCal(); }
-  if(typeof S_DRAFT!=='undefined' && S_DRAFT){ S_DRAFT=null; drawStudent(); }
 }
 
 function saveQuick(){
@@ -1834,7 +1829,7 @@ attachDrag($('#calBody'), (a,b)=>{
   if(anchor) openNewQuick(a,b,anchor);
 });
 let sCalY=+TODAY.slice(0,4), sCalM=+TODAY.slice(5,7)-1, sFilter='all';
-let S_DRAFT=null, sSeq=100;
+let sSeq=100;
 /* 직원용에서 '학생 공개'를 켠 업무를 학생 일정으로 변환합니다.
    같은 데이터를 쓰되, 학생에게는 공개용 이름·안내만 보입니다. */
 function publishedTasks(){
@@ -1885,16 +1880,11 @@ function deleteImportedEvent(id){
   drawStudent();
 }
 const studentEvents=()=>{
-  const list=allStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter)
+  return allStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter)
     .map(e=>({id:e.id,name:e.name,start:e.start,end:e.end,color:kind(e.kind).color,src:'sev'}));
-  if(S_DRAFT){
-    list.push({id:'__sdraft', name:S_DRAFT.name.trim()||'(제목 없음)',
-      start:S_DRAFT.start, end:S_DRAFT.end, color:'var(--brand)', src:'draft', draft:true});
-  }
-  return list;
 };
 function drawStudent(){
-  renderCalendar($('#sCalBody'),$('#sCalTitle'),sCalY,sCalM,studentEvents(),true,'+ 추가');
+  renderCalendar($('#sCalBody'),$('#sCalTitle'),sCalY,sCalM,studentEvents(),false);
   $('#sCalLegend').innerHTML=S_KIND.map(k=>`<span><i style="background:${k.color}"></i>${k.name}</span>`).join('');
   drawUpdatedAt();
   const up=allStudentEvents().filter(e=>e.end>=TODAY).sort((a,b)=>a.start.localeCompare(b.start)).slice(0,6);
@@ -1917,76 +1907,9 @@ function drawStudent(){
     <td>${esc(e.desc||'')}${e.url?`<br><a href="${esc(e.url)}" target="_blank" rel="noopener" style="color:var(--brand);font-size:11.5px;font-weight:700">바로가기 ↗</a>`:''}</td></tr>`).join('');
 }
 
-/* ── 학생 일정 추가 (직원이 작성 → 학생이 열람) ── */
-attachDrag($('#sCalBody'), (a,b)=>{
-  S_DRAFT={start:a, end:b, name:''};
-  drawStudent();
-  const anchor=anchorForDraft($('#sCalBody'),'__sdraft',a);
-  if(anchor) openStudentQuick(a,b,anchor);
-});
-
-function openStudentQuick(startIso, endIso, anchorEl){
-  const pop=$('#quickpop');
-  pop.innerHTML=`
-    <div class="qp-top"><button class="qp-x" id="qpX2" aria-label="닫기">✕</button></div>
-    <input type="text" id="spTitle" class="qp-title" placeholder="제목 추가" autocomplete="off">
-    <div class="qp-row">
-      <svg class="qp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
-      <div class="qp-body">
-        <div class="qp-dates">
-          <input type="date" id="spStart" value="${startIso}">
-          <span class="to">~</span>
-          <input type="date" id="spEnd" value="${endIso||startIso}">
-        </div>
-        <div class="qp-hint" id="spHint">${startIso!==endIso?`${diffDays(startIso,endIso)+1}일간 일정입니다.`:'하루짜리 일정입니다.'}</div>
-      </div>
-    </div>
-    <div class="qp-row">
-      <svg class="qp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
-      <div class="qp-body">
-        <select id="spKind">${S_KIND.map(k=>`<option value="${k.id}">${esc(k.name)}</option>`).join('')}</select>
-      </div>
-    </div>
-    <div class="qp-row">
-      <svg class="qp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
-      <div class="qp-body">
-        <input type="url" id="spUrl" placeholder="링크 (선택) — https://" style="width:100%;font-family:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink)">
-        <div class="qp-hint">넣으면 학생 화면에 '바로가기' 버튼으로 나옵니다.</div>
-      </div>
-    </div>
-    <div class="qp-foot">
-      <button class="qp-more" id="spMore">안내 문구 추가</button>
-      <button class="qp-save" id="spSave">추가</button>
-    </div>`;
-  pop.hidden=false;
-  positionPopup(pop, anchorEl);
-  $('#spTitle').addEventListener('input',()=>{
-    if(!S_DRAFT)return; S_DRAFT.name=$('#spTitle').value; drawStudent();
-  });
-  const sync=()=>{
-    if(!S_DRAFT)return;
-    let s=$('#spStart').value, e2=$('#spEnd').value||s;
-    if(e2<s){ e2=s; $('#spEnd').value=s; }
-    S_DRAFT.start=s; S_DRAFT.end=e2; drawStudent();
-    $('#spHint').textContent = s!==e2 ? `${diffDays(s,e2)+1}일간 일정입니다.` : '하루짜리 일정입니다.';
-  };
-  $('#spStart').addEventListener('change',sync);
-  $('#spEnd').addEventListener('change',sync);
-  $('#spTitle').focus();
-}
-function saveStudentEvent(desc){
-  const name=$('#spTitle').value.trim();
-  if(!name){ toast('제목을 입력해주세요.'); $('#spTitle').focus(); return false; }
-  const start=$('#spStart').value, end=$('#spEnd').value||start;
-  const url=$('#spUrl').value.trim();
-  const ev={id:'SN'+(sSeq++), kind:$('#spKind').value, name, start, end,
-    desc:desc||'', where:'장학복지팀', url:url||''};
-  S_EVENTS.push(ev);
-  cloudInsertEvents([ev]);
-  S_DRAFT=null; $('#quickpop').hidden=true;
-  drawStudent(); toast(`"${name}" 일정을 추가했습니다.`);
-  return true;
-}
+/* 학생용 캘린더는 열람 전용입니다. 일정을 학생용 캘린더에 반영하려면
+   ① 직원용 '지급일 업로드'에서 파일/수기로 추가하거나,
+   ② 직원용 업무를 '학생 공개'로 켜서 넘기는 두 경로만 사용합니다. */
 
 /* ===== 서랍 ===== */
 function openTask(id){
@@ -2359,9 +2282,6 @@ function setMode(m){
   $('#v-staff').hidden = (m!=='staff') || locked;
   $('#v-student').hidden = m!=='student';
   $('#whoWrap').style.display=(m==='staff'&&!locked)?'':'none';
-  $('#paletteWrap').style.display=(m==='student')?'none':'';
-  $('#themeBtn').style.display=(m==='student')?'none':'';
-  $('#demoLabel').style.display=(m==='student')?'none':'';
   $('#visitPill').style.display=(m==='student')?'':'none';
   $('#stripNote').textContent = locked ? '코드를 입력하면 열립니다.' : NOTE[m];
   $('#tabBar').innerHTML = locked ? '' : tabsHtml(m, TABS[m][0][0]);
@@ -2456,20 +2376,6 @@ $('#quickpop').addEventListener('click',e=>{
   if(e.target.id==='qpX'||e.target.id==='qpX2'){closeQuickpop();return}
   if(e.target.id==='qpSave'){saveQuick();return}
   if(e.target.id==='qpMore'){openNewFull();return}
-  if(e.target.id==='spSave'){saveStudentEvent($('#spDesc')?$('#spDesc').value.trim():'');return}
-  if(e.target.id==='spMore'){
-    if($('#spDesc')) return;
-    const foot=$('#quickpop').querySelector('.qp-foot');
-    const box=document.createElement('div');
-    box.className='qp-row';
-    box.innerHTML=`<svg class="qp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 11h16M4 16h9"/></svg>
-      <div class="qp-body"><textarea id="spDesc" placeholder="학생에게 보여줄 안내 문구 (선택)"
-        style="width:100%;min-height:62px;resize:vertical;font-family:inherit;font-size:12.5px;line-height:1.6;padding:7px 9px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink)"></textarea></div>`;
-    foot.parentNode.insertBefore(box, foot);
-    e.target.textContent='안내 문구';
-    $('#spDesc').focus();
-    return;
-  }
 });
 $('#drawer').addEventListener('change',e=>{
   const po=e.target.closest('[data-pubon]');
@@ -2580,13 +2486,7 @@ const PALETTES={
 let paletteByMode={staff:'slate', student:'sky'};
 function applyPalette(m){
   document.documentElement.dataset.palette=paletteByMode[m];
-  $('#palSel').innerHTML=PALETTES[m].map(([v,n])=>
-    `<option value="${v}" ${v===paletteByMode[m]?'selected':''}>${n}</option>`).join('');
 }
-$('#palSel').addEventListener('change',e=>{
-  paletteByMode[mode]=e.target.value;
-  document.documentElement.dataset.palette=e.target.value;
-});
 
 /* 메모 패널 접기 / 펼치기 */
 function setMemoFold(fold){
@@ -2595,15 +2495,11 @@ function setMemoFold(fold){
   $('#memoUnfold').hidden=!fold;
 }
 
-/* 밝게 / 어둡게 — 뷰어의 설정보다 여기서 고른 값이 우선합니다 */
+/* 화면은 항상 밝은 테마로 고정합니다 (화면색·밝게 전환 컨트롤은 제거됨) */
 function setTheme(t){
   document.documentElement.dataset.theme=t;
-  $('#themeBtn').textContent = (t==='dark') ? '어둡게' : '밝게';
   try{ localStorage.setItem('klink_theme', t); }catch(_){}
 }
-$('#themeBtn').addEventListener('click',()=>{
-  setTheme(document.documentElement.dataset.theme==='dark' ? 'light' : 'dark');
-});
 
 /* 파일 끌어다 놓기 */
 (function(){
@@ -2617,11 +2513,7 @@ $('#themeBtn').addEventListener('click',()=>{
 })();
 
 document.documentElement.dataset.palette='slate';
-(function(){
-  let saved=null;
-  try{ saved=localStorage.getItem('klink_theme'); }catch(_){}
-  setTheme(saved || 'light');       // 기본은 밝은 화면
-})();
+setTheme('light');       // 기본이자 유일한 화면 — 전환 컨트롤 제거됨
 $('#lkGo').addEventListener('click',tryUnlock);
 $('#lkInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();tryUnlock();} });
 drawDeptChips(); drawImpactSel(); drawMemos(); drawKeywords(); setMode('student');

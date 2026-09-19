@@ -1684,6 +1684,27 @@ function openNewFull(opts){
       <textarea id="nfCri" placeholder="한 줄에 하나씩 적어주세요&#10;예)&#10;대상자 명단 확정&#10;재무팀 전달자료 생성&#10;전달 일시 기록"></textarea></div>
     <div class="field"><label for="nfFiles">전달자료 (쉼표로 구분)</label>
       <input type="text" id="nfFiles" placeholder="예: 대상자 명단, 검증 결과표"></div>
+    <div class="dr-sec">
+      <h4>학생 공개</h4>
+      <label class="switch">
+        <input type="checkbox" id="nfPubOn">
+        <span class="track"><span class="knob"></span></span>
+        <span class="lbl">학생용 달력에 바로 표시</span>
+      </label>
+      <div id="nfPubFields" hidden>
+        <div class="field"><label for="nfPubLabel">학생에게 보여줄 이름</label>
+          <input type="text" id="nfPubLabel" placeholder="비워두면 업무명 그대로 표시"></div>
+        <div class="row2">
+          <div class="field"><label for="nfPubKind">구분</label>
+            <select id="nfPubKind">${S_KIND.map(k=>`<option value="${k.id}">${esc(k.name)}</option>`).join('')}</select></div>
+          <div class="field"><label for="nfPubUrl">링크</label>
+            <input type="url" id="nfPubUrl" placeholder="https://"></div>
+        </div>
+        <div class="field"><label for="nfPubDesc">안내 문구</label>
+          <textarea id="nfPubDesc" placeholder="학생에게 보여줄 설명 (선택)"></textarea></div>
+        <div class="hintline">업무를 추가하면 바로 학생용 캘린더에도 함께 표시됩니다.</div>
+      </div>
+    </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="nfSave">업무 추가</button>
       <button class="btn ghost" id="nfCancel">취소</button>
@@ -1700,10 +1721,20 @@ function saveNewFull(){
   const t=addTask({name, dept:$('#nfDept').value, owner:$('#nfOwner').value.trim(), date, end,
     flow:$('#nfFlow').value, prev:prevId?{id:prevId,lead:Math.max(0,+$('#nfLead').value||0)}:null,
     files, criteria:cri});
+  const pubOn=$('#nfPubOn'), isPub=!!(pubOn&&pubOn.checked);
+  if(isPub){
+    t.isPublic=true;
+    t.publicLabel=$('#nfPubLabel').value.trim();
+    t.publicKind=$('#nfPubKind').value;
+    t.publicUrl=$('#nfPubUrl').value.trim();
+    t.publicDesc=$('#nfPubDesc').value.trim();
+  }
   const f=FLOWS.find(x=>x.id===t.flow);
   if(f){ if(!f.order) f.order=[]; if(!f.order.includes(t.id)) f.order.push(t.id); }
   syncOrder(); drawFlows(); drawDeptRows();
-  closeDrawer(); toast(`"${name}" 업무를 추가했습니다. 캘린더·연결 지도에도 함께 등록됩니다.`);
+  closeDrawer();
+  toast(isPub?`"${name}" 업무를 추가하고 학생용 캘린더에도 바로 표시했습니다.`
+             :`"${name}" 업무를 추가했습니다. 캘린더·연결 지도에도 함께 등록됩니다.`);
 }
 
 /* ===== 부서 메모 ===== */
@@ -2378,6 +2409,7 @@ $('#quickpop').addEventListener('click',e=>{
   if(e.target.id==='qpMore'){openNewFull();return}
 });
 $('#drawer').addEventListener('change',e=>{
+  if(e.target.id==='nfPubOn'){ $('#nfPubFields').hidden=!e.target.checked; return; }
   const po=e.target.closest('[data-pubon]');
   if(po){
     const t=byId(po.dataset.pubon);

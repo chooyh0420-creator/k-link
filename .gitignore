@@ -1,0 +1,5 @@
+# 로컬 전용 / 비밀정보
+.credentials
+*.token
+.DS_Store
+Thumbs.db

@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   /* 계명대학교 홈페이지 톤 — 밝은 흰 배경 + 계명 네이비/크림슨 */
@@ -1075,6 +1076,7 @@ try{ PAY_UPDATED_AT = localStorage.getItem('klink_pay_updated_at'); }catch(_){}
 function markPayUpdated(){
   PAY_UPDATED_AT = new Date().toISOString();
   try{ localStorage.setItem('klink_pay_updated_at', PAY_UPDATED_AT); }catch(_){}
+  cloudSetMeta('pay_updated_at', PAY_UPDATED_AT);
   drawUpdatedAt();
 }
 function drawUpdatedAt(){
@@ -1083,6 +1085,87 @@ function drawUpdatedAt(){
   const d=new Date(PAY_UPDATED_AT);
   const txt=isNaN(d) ? '' : d.toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
   el.innerHTML=`<span class="dot"></span>자료 업데이트 <b>${esc(txt)}</b>`;
+}
+
+/* ===== 클라우드 동기화(Supabase) =====
+   K-Link는 지금까지 브라우저 메모리에만 데이터를 담고 있어서, 새로고침하거나
+   다른 기기(학생 폰 등)로 열면 방금 올린 지급일이 전부 사라졌습니다.
+   최소한 '학생용 캘린더 일정'과 '지급일 업로드용 장학 키워드'만이라도
+   모든 기기에서 함께 보이도록 Supabase에 저장·조회합니다.
+   (Supabase 연결이 안 되는 상황이어도 앱은 기존처럼 메모리만으로 동작합니다.) */
+const SB_URL='https://mfvifreyikksugkylirs.supabase.co';
+const SB_KEY='sb_publishable_bXOqP1h-uDlPaK5xnx714Q_Uz1XyUW4';
+let sb=null;
+try{ if(window.supabase) sb=window.supabase.createClient(SB_URL, SB_KEY); }catch(_){}
+
+function eventToRow(e){
+  return {id:e.id, kind:e.kind, name:e.name, start_date:e.start, end_date:e.end||e.start,
+    description:e.desc||'', location:e.where||'', url:e.url||''};
+}
+function rowToEvent(r){
+  return {id:r.id, kind:r.kind, name:r.name, start:r.start_date, end:r.end_date||r.start_date,
+    desc:r.description||'', where:r.location||'', url:r.url||''};
+}
+async function cloudInsertEvents(events){
+  if(!sb || !events || !events.length) return;
+  try{ const {error}=await sb.from('klink_student_events').insert(events.map(eventToRow));
+    if(error) console.warn('클라우드 저장 실패(일정):', error.message); }
+  catch(err){ console.warn('클라우드 저장 실패(일정):', err); }
+}
+async function cloudInsertKeyword(k){
+  if(!sb) return;
+  try{ const {error}=await sb.from('klink_pay_keywords').insert({id:k.id, word:k.word, label:k.label||'', kind:k.kind||'pay'});
+    if(error) console.warn('클라우드 저장 실패(키워드):', error.message); }
+  catch(err){ console.warn('클라우드 저장 실패(키워드):', err); }
+}
+async function cloudDeleteKeyword(id){
+  if(!sb) return;
+  try{ const {error}=await sb.from('klink_pay_keywords').delete().eq('id', id);
+    if(error) console.warn('클라우드 삭제 실패(키워드):', error.message); }
+  catch(err){ console.warn('클라우드 삭제 실패(키워드):', err); }
+}
+async function cloudSetMeta(key, value){
+  if(!sb) return;
+  try{ const {error}=await sb.from('klink_meta').upsert({key, value});
+    if(error) console.warn('클라우드 저장 실패(메타):', error.message); }
+  catch(err){ console.warn('클라우드 저장 실패(메타):', err); }
+}
+/* 페이지를 처음 열 때: DB에 저장된 지급일 일정·키워드·업데이트 시각을 불러와
+   화면에 반영합니다. DB에 아무것도 없는 최초 1회에는 기본 키워드 3개를 심어둡니다. */
+async function initCloudSync(){
+  if(!sb) return;
+  try{
+    const [evRes, kwRes, metaRes] = await Promise.all([
+      sb.from('klink_student_events').select('*').order('start_date'),
+      sb.from('klink_pay_keywords').select('*').order('created_at'),
+      sb.from('klink_meta').select('*').eq('key','pay_updated_at')
+    ]);
+    if(evRes.data && evRes.data.length){
+      const known=new Set(S_EVENTS.map(e=>e.id));
+      evRes.data.forEach(r=>{ if(!known.has(r.id)) S_EVENTS.push(rowToEvent(r)); });
+      /* sSeq는 매 새로고침마다 100부터 다시 시작하는데, DB에는 지난번 세션이
+         만든 SN100.. 같은 id가 이미 있을 수 있습니다. 그대로 두면 다음 번
+         업로드가 같은 id와 충돌해 저장에 실패하므로, 기존 최대값 다음부터
+         이어가도록 맞춥니다. */
+      const snNums = S_EVENTS.map(e=>{ const m=String(e.id).match(/^SN(\d+)$/); return m?parseInt(m[1],10):0; });
+      sSeq = Math.max(sSeq, ...snNums, 100)+1;
+    }
+    if(kwRes.data && kwRes.data.length){
+      KEYWORDS = kwRes.data.map(r=>({id:r.id, word:r.word, label:r.label||'', kind:r.kind||'pay'}));
+      const nums = KEYWORDS.map(k=>parseInt(String(k.id).replace(/[^0-9]/g,''),10)||0);
+      kwSeq = Math.max(kwSeq, 10, ...nums)+1;
+    }else{
+      KEYWORDS.forEach(k=>cloudInsertKeyword(k));
+    }
+    if(metaRes.data && metaRes.data.length && metaRes.data[0].value){
+      PAY_UPDATED_AT = metaRes.data[0].value;
+      try{ localStorage.setItem('klink_pay_updated_at', PAY_UPDATED_AT); }catch(_){}
+    }
+  }catch(err){
+    console.warn('클라우드 동기화 실패, 이 브라우저 메모리 데이터로만 표시합니다:', err);
+  }
+  drawKeywords();
+  if(mode==='student'){ drawStudent(); } else if(mode==='staff'){ drawStaff(); }
 }
 const S_EVENTS=[
  {id:'S1',kind:'apply',name:'2027-1학기 국가장학금 1차 신청',start:'2026-11-20',end:'2026-12-27',
@@ -1849,8 +1932,10 @@ function saveStudentEvent(desc){
   if(!name){ toast('제목을 입력해주세요.'); $('#spTitle').focus(); return false; }
   const start=$('#spStart').value, end=$('#spEnd').value||start;
   const url=$('#spUrl').value.trim();
-  S_EVENTS.push({id:'SN'+(sSeq++), kind:$('#spKind').value, name, start, end,
-    desc:desc||'', where:'장학복지팀', url:url||''});
+  const ev={id:'SN'+(sSeq++), kind:$('#spKind').value, name, start, end,
+    desc:desc||'', where:'장학복지팀', url:url||''};
+  S_EVENTS.push(ev);
+  cloudInsertEvents([ev]);
   S_DRAFT=null; $('#quickpop').hidden=true;
   drawStudent(); toast(`"${name}" 일정을 추가했습니다.`);
   return true;
@@ -2010,7 +2095,9 @@ function drawKeywords(){
 function addKeyword(){
   const w=$('#kwWord').value.trim();
   if(!w){ toast('결의제목에 들어가는 말을 입력해주세요.'); $('#kwWord').focus(); return; }
-  KEYWORDS.push({id:'K'+(kwSeq++), word:w, label:$('#kwLabel').value.trim(), kind:$('#kwKind').value});
+  const k={id:'K'+(kwSeq++), word:w, label:$('#kwLabel').value.trim(), kind:$('#kwKind').value};
+  KEYWORDS.push(k);
+  cloudInsertKeyword(k);
   $('#kwWord').value=''; $('#kwLabel').value='';
   drawKeywords();
   if(PREVIEW.length) applyMatch();
@@ -2116,13 +2203,16 @@ function drawPreview(){
 function importSelected(){
   const picks=PREVIEW.filter(r=>r.checked);
   if(!picks.length){ toast('올릴 항목을 선택해주세요.'); return; }
+  const added=[];
   picks.forEach(r=>{
-    S_EVENTS.push({id:'SN'+(sSeq++), kind:r.kind||'pay', name:r.label||cleanTitle(r.title),
-      start:r.date, end:r.date, desc:'', where:'장학복지팀', url:''});
+    const ev={id:'SN'+(sSeq++), kind:r.kind||'pay', name:r.label||cleanTitle(r.title),
+      start:r.date, end:r.date, desc:'', where:'장학복지팀', url:''};
+    S_EVENTS.push(ev); added.push(ev);
   });
   toast(`${picks.length}건을 학생용 캘린더에 올렸습니다.`);
   PREVIEW.forEach(r=>{ r.checked=false; });
   markPayUpdated();
+  cloudInsertEvents(added);
   drawPreview(); drawStudent();
 }
 
@@ -2249,7 +2339,7 @@ document.addEventListener('click',e=>{
   if(e.target.id==='printBtn'){window.print();return}
   /* 지급일 가져오기 */
   const kd=e.target.closest('[data-kwdel]');
-  if(kd){ KEYWORDS=KEYWORDS.filter(k=>k.id!==kd.dataset.kwdel); drawKeywords(); if(PREVIEW.length) applyMatch(); return; }
+  if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId); drawKeywords(); if(PREVIEW.length) applyMatch(); return; }
   if(e.target.id==='kwAdd'){addKeyword();return}
   if(e.target.id==='filePick'){$('#fileInput').click();return}
   if(e.target.id==='selMatched'){PREVIEW.forEach(r=>r.checked=r.matched);drawPreview();return}
@@ -2452,6 +2542,7 @@ document.documentElement.dataset.palette='slate';
 $('#lkGo').addEventListener('click',tryUnlock);
 $('#lkInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();tryUnlock();} });
 drawDeptChips(); drawImpactSel(); drawMemos(); drawKeywords(); setMode('student');
+initCloudSync();
 </script>
 </body>
 </html>

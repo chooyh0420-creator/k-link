@@ -873,7 +873,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 
     <div class="step">
       <div class="step-h"><span class="step-n">2</span><h3>「결의서조회및출력」에서 내려받은 엑셀 파일 넣기</h3>
-        <span class="sub">.xlsx 또는 .csv</span></div>
+        <span class="sub">.xlsx 또는 .csv — 넣는 즉시 등록된 키워드와 일치하는 항목이 자동으로 학생용 캘린더에 반영됩니다.</span></div>
       <div class="filebox" id="fileBox">
         <p>파일을 이곳에 끌어다 놓거나 아래 버튼으로 선택하세요.</p>
         <button class="btn btn-sm" id="filePick">파일 선택</button>
@@ -882,19 +882,19 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
       </div>
     </div>
 
-    <div class="step" id="previewStep" hidden>
-      <div class="step-h"><span class="step-n">3</span><h3>확인하고 학생용 캘린더에 올리기</h3>
-        <span class="sub">체크된 항목만 올라갑니다. 이름은 직접 고칠 수 있습니다.</span></div>
-      <div class="prevtools">
-        <button class="mini" id="selMatched">등록한 장학만 선택</button>
-        <button class="mini" id="selAll">전체 선택</button>
-        <button class="mini" id="selNone">전체 해제</button>
-        <span class="cnt" id="prevCount"></span>
+    <div class="step" id="previewStep">
+      <div class="step-h"><span class="step-n">3</span><h3>학생용 캘린더에 반영된 장학 목록</h3>
+        <span class="sub">여기 있는 항목이 그대로 학생용 캘린더에 표시됩니다. 필요 없는 항목은 목록 오른쪽 ✕로 지워주세요.</span></div>
+      <div class="prevtools" style="flex-wrap:wrap;row-gap:8px">
+        <input type="date" id="manDate" style="font-family:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink)">
+        <input type="text" id="manLabel" placeholder="학생에게 보여줄 이름 (수기 입력)" style="flex:1;min-width:180px;font-family:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink)">
+        <select id="manKind" style="font-family:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink)"></select>
+        <button class="mini" id="manAdd">수기로 추가</button>
+        <span class="cnt" id="prevCount" style="margin-left:auto"></span>
       </div>
       <div class="tbl-wrap" style="margin-bottom:14px"><table>
-        <thead><tr><th style="width:38px"></th><th>지급일</th><th>학생에게 보여줄 이름</th><th>결의제목(원본)</th><th>구분</th><th>금액</th></tr></thead>
+        <thead><tr><th>지급일</th><th>학생에게 보여줄 이름</th><th>원본(결의제목 등)</th><th>구분</th><th>금액</th><th style="width:44px"></th></tr></thead>
         <tbody id="prevRows"></tbody></table></div>
-      <button class="btn" id="importGo">선택 항목 학생용 캘린더에 올리기</button>
     </div>
   </section>
 
@@ -1101,11 +1101,13 @@ try{ if(window.supabase) sb=window.supabase.createClient(SB_URL, SB_KEY); }catch
 
 function eventToRow(e){
   return {id:e.id, kind:e.kind, name:e.name, start_date:e.start, end_date:e.end||e.start,
-    description:e.desc||'', location:e.where||'', url:e.url||''};
+    description:e.desc||'', location:e.where||'', url:e.url||'',
+    source:e.source||null, source_title:e.srcTitle||null, amount:e.amount||null};
 }
 function rowToEvent(r){
   return {id:r.id, kind:r.kind, name:r.name, start:r.start_date, end:r.end_date||r.start_date,
-    desc:r.description||'', where:r.location||'', url:r.url||''};
+    desc:r.description||'', where:r.location||'', url:r.url||'',
+    source:r.source||null, srcTitle:r.source_title||null, amount:r.amount||null};
 }
 async function cloudInsertEvents(events){
   if(!sb || !events || !events.length) return;
@@ -1131,17 +1133,12 @@ async function cloudSetMeta(key, value){
     if(error) console.warn('클라우드 저장 실패(메타):', error.message); }
   catch(err){ console.warn('클라우드 저장 실패(메타):', err); }
 }
-let previewSaveTimer=null;
-/* 지급일 업로드 미리보기(파일을 넣고 확인하는 3단계 화면)도 새로고침하거나
-   나중에 다시 열어도 남아있도록 저장합니다. 새 파일을 올리면 이전 미리보기를
-   자동으로 덮어씁니다. */
-function cloudSavePreview(){
-  if(!sb) return;
-  clearTimeout(previewSaveTimer);
-  previewSaveTimer=setTimeout(()=>{
-    const fileName = $('#fileName') ? $('#fileName').textContent : '';
-    cloudSetMeta('preview_state', JSON.stringify({fileName, rows:PREVIEW}));
-  }, 400);
+/* 지급일 업로드로 반영된 항목을 '삭제'하면 실제로는 이 목록(hidden_event_ids)에
+   id를 추가해 화면(캘린더·목록 어디서든)에서만 숨깁니다. 되돌릴 수 있게 원본
+   데이터는 그대로 두는 방식이라, 실수로 지웠을 때도 안전하게 복구할 수 있습니다. */
+let HIDDEN_IDS=new Set();
+function persistHiddenIds(){
+  cloudSetMeta('hidden_event_ids', JSON.stringify([...HIDDEN_IDS]));
 }
 /* 페이지를 처음 열 때: DB에 저장된 지급일 일정·키워드·업데이트 시각을 불러와
    화면에 반영합니다. DB에 아무것도 없는 최초 1회에는 기본 키워드 3개를 심어둡니다. */
@@ -1177,25 +1174,15 @@ async function initCloudSync(){
         PAY_UPDATED_AT = metaMap.pay_updated_at;
         try{ localStorage.setItem('klink_pay_updated_at', PAY_UPDATED_AT); }catch(_){}
       }
-      if(metaMap.preview_state){
-        try{
-          const saved=JSON.parse(metaMap.preview_state);
-          if(saved && Array.isArray(saved.rows) && saved.rows.length){
-            /* 저장된 시점 이후 다른 담당자가 키워드를 지웠을 수도 있으므로,
-               불러올 때마다 지금 등록된 키워드 기준으로 다시 한 번 걸러서 보여줍니다. */
-            PREVIEW=saved.rows.filter(r=>matchKeyword(r.title));
-            if($('#fileName')) $('#fileName').textContent=saved.fileName||'';
-            if($('#previewStep')) $('#previewStep').hidden=false;
-            drawPreview();
-            if(PREVIEW.length!==saved.rows.length) cloudSavePreview();
-          }
-        }catch(_){ /* 저장된 미리보기 형식이 깨졌으면 무시 */ }
+      if(metaMap.hidden_event_ids){
+        try{ HIDDEN_IDS=new Set(JSON.parse(metaMap.hidden_event_ids)); }catch(_){ /* 무시 */ }
       }
     }
   }catch(err){
     console.warn('클라우드 동기화 실패, 이 브라우저 메모리 데이터로만 표시합니다:', err);
   }
   drawKeywords();
+  drawImportedList();
   if(mode==='student'){ drawStudent(); } else if(mode==='staff'){ drawStaff(); }
 }
 const S_EVENTS=[
@@ -1878,7 +1865,21 @@ function dedupEvents(list){
     return true;
   });
 }
-function allStudentEvents(){ return dedupEvents(S_EVENTS.concat(publishedTasks())); }
+function allStudentEvents(){
+  return dedupEvents(S_EVENTS.concat(publishedTasks()).filter(e=>!HIDDEN_IDS.has(e.id)));
+}
+/* 지급일 업로드(파일 자동 반영 + 수기 추가)로 생긴 항목만 모은 관리용 목록입니다.
+   국고/교비처럼 같은 이름의 항목도 각각 따로 보여줘서 개별적으로 삭제할 수 있습니다. */
+function importedEvents(){
+  return S_EVENTS.filter(e=>(e.source==='import'||e.source==='manual') && !HIDDEN_IDS.has(e.id))
+    .sort((a,b)=>a.start.localeCompare(b.start));
+}
+function deleteImportedEvent(id){
+  HIDDEN_IDS.add(id);
+  persistHiddenIds();
+  drawImportedList();
+  drawStudent();
+}
 const studentEvents=()=>{
   const list=allStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter)
     .map(e=>({id:e.id,name:e.name,start:e.start,end:e.end,color:kind(e.kind).color,src:'sev'}));
@@ -2120,8 +2121,6 @@ let KEYWORDS=[
   {id:'K3', word:'교내 고정근로', label:'교내 고정근로장학금 지급', kind:'pay'}
 ];
 let kwSeq=10;
-let PREVIEW=[];   // [{checked, date, label, title, gubun, amount, matched}] — 키워드와 일치하는 행만 담깁니다
-let LAST_ROWS=[]; // 마지막으로 불러온 파일에서 읽은 「지출」 행 전체(키워드 필터 전). 키워드가 추가·삭제되면 여기서 다시 걸러냅니다.
 
 function drawKeywords(){
   $('#kwList').innerHTML = KEYWORDS.length ? KEYWORDS.map(k=>`
@@ -2134,6 +2133,8 @@ function drawKeywords(){
     : '<div class="kwempty">아직 등록한 장학이 없습니다. 아래에서 추가해주세요.</div>';
   const sel=$('#kwKind');
   if(sel && !sel.options.length) sel.innerHTML=S_KIND.map(k=>`<option value="${k.id}" ${k.id==='pay'?'selected':''}>${esc(k.name)}</option>`).join('');
+  const mk=$('#manKind');
+  if(mk && !mk.options.length) mk.innerHTML=S_KIND.map(k=>`<option value="${k.id}" ${k.id==='pay'?'selected':''}>${esc(k.name)}</option>`).join('');
 }
 function addKeyword(){
   const w=$('#kwWord').value.trim();
@@ -2143,8 +2144,7 @@ function addKeyword(){
   cloudInsertKeyword(k);
   $('#kwWord').value=''; $('#kwLabel').value='';
   drawKeywords();
-  if(LAST_ROWS.length) applyMatch();
-  toast(`"${w}" 장학을 목록에 추가했습니다.`);
+  toast(`"${w}" 장학을 목록에 추가했습니다. 다음에 파일을 넣을 때부터 적용됩니다.`);
 }
 
 /* 전표번호 → 날짜 */
@@ -2165,30 +2165,6 @@ function matchKeyword(title){
   const t=String(title||'');
   return KEYWORDS.find(k=>k.word && t.includes(k.word)) || null;
 }
-/* 등록된 키워드와 일치하는 행만 골라 PREVIEW를 다시 만듭니다.
-   다른 부서 결의 내역까지 화면에 노출되지 않도록, 일치하지 않는 행은
-   미리보기에 아예 나타나지 않고 저장도 되지 않습니다.
-   preserveState가 true면(키워드 추가/삭제 시) 기존에 체크·수정해둔 상태를 최대한 유지합니다. */
-function applyMatch(preserveState){
-  const prevByKey={};
-  if(preserveState!==false){
-    PREVIEW.forEach(r=>{ prevByKey[r.date+'|'+r.title]={checked:r.checked, label:r.label}; });
-  }
-  PREVIEW = LAST_ROWS.map(r=>{
-    const k=matchKeyword(r.title);
-    if(!k) return null;
-    const prior=prevByKey[r.date+'|'+r.title];
-    return {
-      date:r.date, title:r.title, gubun:r.gubun, stat:r.stat, amount:r.amount,
-      kind:k.kind||'pay', matched:true,
-      label: prior ? prior.label : (k.label||cleanTitle(r.title)),
-      checked: prior ? prior.checked : true
-    };
-  }).filter(Boolean);
-  PREVIEW.sort((a,b)=>a.date.localeCompare(b.date));
-  drawPreview();
-  cloudSavePreview();
-}
 
 function readSheet(file){
   const reader=new FileReader();
@@ -2204,6 +2180,9 @@ function readSheet(file){
   };
   reader.readAsArrayBuffer(file);
 }
+/* 파일을 넣으면 등록된 키워드와 일치하는 「지출」 행을 찾아 자동으로
+   학생용 캘린더에 반영합니다(체크·별도 확인 없이 기본 동작). 이미 반영되어
+   있는 결의(같은 결의제목)는 건너뛰어 중복으로 쌓이지 않게 합니다. */
 function buildPreview(grid){
   /* 머리글 줄을 찾아 열 위치를 잡습니다 (열 순서가 달라져도 동작하도록) */
   let hi=-1;
@@ -2217,7 +2196,7 @@ function buildPreview(grid){
   const cSlip=col('전표번호'), cTitle=col('결의제목'),
         cAmt=col('결의금액'), cGubun=col('구분'), cStat=col('진행상태');
 
-  LAST_ROWS=[];
+  const rows=[];
   let skippedNonPay=0;
   for(let i=hi+1;i<grid.length;i++){
     const row=grid[i]||[];
@@ -2229,46 +2208,92 @@ function buildPreview(grid){
     /* '수입'(재단·정부에서 학교로 들어오는 돈)과 '대체'(내부 회계 정리)는
        학생에게 나가는 지급일이 아니므로 학생용 캘린더 후보에서 제외합니다. */
     if(cGubun>-1 && gubun!=='지출'){ skippedNonPay++; continue; }
-    LAST_ROWS.push({ date, title, gubun, stat:String(row[cStat]||'').trim(), amount:String(row[cAmt]||'').trim() });
+    rows.push({ date, title, gubun, stat:String(row[cStat]||'').trim(), amount:String(row[cAmt]||'').trim() });
   }
-  if(!LAST_ROWS.length){ toast('전표번호가 있는 「지출」 행을 찾지 못했습니다.'); PREVIEW=[]; drawPreview(); cloudSavePreview(); return; }
-  $('#previewStep').hidden=false;
-  applyMatch(false);   // 새 파일이므로 이전 미리보기 상태는 이어받지 않고 새로 만듭니다
+  if(!rows.length){ toast('전표번호가 있는 「지출」 행을 찾지 못했습니다.'); return; }
+
+  const matched=rows.map(r=>{
+    const k=matchKeyword(r.title);
+    if(!k) return null;
+    return {date:r.date, title:r.title, label:k.label||cleanTitle(r.title), kind:k.kind||'pay', amount:r.amount};
+  }).filter(Boolean);
+
+  const added=autoImportMatched(matched);
   const skipNote = skippedNonPay ? ` (수입·대체 ${skippedNonPay}건은 지급일이 아니라서 제외)` : '';
-  if(!PREVIEW.length){
-    toast(`파일에서 ${LAST_ROWS.length}건을 읽었지만, 등록한 장학 키워드와 일치하는 결의가 없습니다. 위 1번 목록에 키워드를 등록해주세요.${skipNote}`);
+  if(!matched.length){
+    toast(`파일에서 ${rows.length}건을 읽었지만, 등록한 장학 키워드와 일치하는 결의가 없습니다. 위 1번 목록에 키워드를 등록해주세요.${skipNote}`);
+  }else if(!added.length){
+    toast(`파일에서 ${matched.length}건을 확인했지만 이미 모두 학생용 캘린더에 반영되어 있어 새로 추가된 항목은 없습니다.${skipNote}`);
   }else{
-    toast(`등록한 장학과 일치하는 ${PREVIEW.length}건을 찾아 모두 선택했습니다.${skipNote}`);
+    toast(`등록한 장학과 일치하는 항목 중 ${added.length}건을 새로 학생용 캘린더에 반영했습니다.${skipNote}`);
   }
 }
-function drawPreview(){
-  $('#prevRows').innerHTML=PREVIEW.map((r,i)=>`
-    <tr class="${r.checked?'picked':''}">
-      <td><input type="checkbox" data-prev="${i}" ${r.checked?'checked':''} style="width:15px;height:15px;accent-color:#2F7BC8"></td>
-      <td class="num">${r.date}</td>
-      <td><input class="tname" data-prevname="${i}" value="${esc(r.label)}"></td>
-      <td style="font-size:11.5px;color:var(--ink-3)">${esc(r.title)}</td>
-      <td style="font-size:11.5px">${esc(r.gubun)}</td>
-      <td class="num">${esc(r.amount)}</td>
-    </tr>`).join('');
-  const n=PREVIEW.filter(r=>r.checked).length;
-  $('#prevCount').textContent=`전체 ${PREVIEW.length}건 중 ${n}건 선택`;
-}
-function importSelected(){
-  const picks=PREVIEW.filter(r=>r.checked);
-  if(!picks.length){ toast('올릴 항목을 선택해주세요.'); return; }
-  const added=[];
-  picks.forEach(r=>{
-    const ev={id:'SN'+(sSeq++), kind:r.kind||'pay', name:r.label||cleanTitle(r.title),
-      start:r.date, end:r.date, desc:'', where:'장학복지팀', url:''};
-    S_EVENTS.push(ev); added.push(ev);
+/* matched(이번 파일에서 키워드와 일치한 행들)를 현재 반영되어 있는 목록과 비교해,
+   아직 없는 것만 새로 추가합니다.
+   - 이 기능으로 새로 추가된 항목은 결의제목 원문(srcTitle)을 그대로 저장해두므로,
+     같은 파일을 다시 넣어도 결의제목이 같으면 정확히 중복을 걸러냅니다.
+   - 예전에(이 기능이 지금 방식으로 바뀌기 전에) 이미 반영된 항목은 결의제목 원문이
+     없을 수 있어, 그런 경우에는 '같은 날짜·같은 이름'이 파일에 몇 건 있는지를 세어
+     그 개수만큼은 이미 반영된 것으로 보고 넘어갑니다. */
+function autoImportMatched(matched){
+  const current=importedEvents();
+  const exactKeys=new Set(current.filter(e=>e.srcTitle).map(e=>e.start+'|'+e.srcTitle));
+  const legacyCount={};
+  current.filter(e=>!e.srcTitle).forEach(e=>{
+    const k=e.start+'|'+e.name;
+    legacyCount[k]=(legacyCount[k]||0)+1;
   });
-  toast(`${picks.length}건을 학생용 캘린더에 올렸습니다.`);
-  PREVIEW.forEach(r=>{ r.checked=false; });
+  const seenNow={};
+  const toAdd=[];
+  matched.forEach(r=>{
+    if(exactKeys.has(r.date+'|'+r.title)) return;
+    const ldKey=r.date+'|'+r.label;
+    seenNow[ldKey]=(seenNow[ldKey]||0)+1;
+    if(seenNow[ldKey]<=(legacyCount[ldKey]||0)) return;
+    toAdd.push(r);
+  });
+  if(toAdd.length){
+    const newEvents=toAdd.map(r=>({id:'SN'+(sSeq++), kind:r.kind, name:r.label, start:r.date, end:r.date,
+      desc:'', where:'장학복지팀', url:'', source:'import', srcTitle:r.title, amount:r.amount}));
+    S_EVENTS.push(...newEvents);
+    cloudInsertEvents(newEvents);
+    markPayUpdated();
+    drawStudent();
+  }
+  drawImportedList();
+  return toAdd;
+}
+function drawImportedList(){
+  if($('#manDate') && !$('#manDate').value) $('#manDate').value=TODAY;
+  const rows=importedEvents();
+  $('#prevRows').innerHTML = rows.length ? rows.map(r=>`
+    <tr>
+      <td class="num">${r.start}</td>
+      <td>${esc(r.name)}</td>
+      <td style="font-size:11.5px;color:var(--ink-3)">${esc(r.srcTitle||(r.source==='manual'?'(수기 입력)':''))}</td>
+      <td style="font-size:11.5px">${esc(kind(r.kind).name)}</td>
+      <td class="num">${esc(r.amount||'')}</td>
+      <td><button class="kd" data-delimp="${r.id}" title="학생용 캘린더에서 삭제">✕</button></td>
+    </tr>`).join('')
+    : `<tr><td colspan="6" style="text-align:center;color:var(--ink-3);padding:16px">아직 반영된 항목이 없습니다. 위에서 파일을 넣거나 수기로 추가해주세요.</td></tr>`;
+  $('#prevCount').textContent = rows.length ? `현재 ${rows.length}건 반영됨` : '';
+}
+/* 파일 없이 한 건만 바로 추가하고 싶을 때 씁니다(예: 아직 결의서로 못 받은 확정 지급일). */
+function addManualEvent(){
+  const date=$('#manDate').value;
+  const label=$('#manLabel').value.trim();
+  const knd=$('#manKind').value||'pay';
+  if(!date){ toast('지급일(날짜)을 입력해주세요.'); $('#manDate').focus(); return; }
+  if(!label){ toast('학생에게 보여줄 이름을 입력해주세요.'); $('#manLabel').focus(); return; }
+  const ev={id:'SN'+(sSeq++), kind:knd, name:label, start:date, end:date,
+    desc:'', where:'장학복지팀', url:'', source:'manual', srcTitle:label};
+  S_EVENTS.push(ev);
+  cloudInsertEvents([ev]);
   markPayUpdated();
-  cloudInsertEvents(added);
-  drawPreview(); drawStudent();
-  cloudSavePreview();
+  $('#manLabel').value='';
+  drawImportedList();
+  drawStudent();
+  toast(`"${label}" 항목을 학생용 캘린더에 추가했습니다.`);
 }
 
 /* ===== 모드 · 탭 ===== */
@@ -2395,16 +2420,14 @@ document.addEventListener('click',e=>{
   /* 지급일 가져오기 */
   const kd=e.target.closest('[data-kwdel]');
   if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId); drawKeywords();
-    if(LAST_ROWS.length){ applyMatch(); }
-    else { const before=PREVIEW.length; PREVIEW=PREVIEW.filter(r=>matchKeyword(r.title));
-      if(PREVIEW.length!==before){ drawPreview(); cloudSavePreview(); } }
     return; }
   if(e.target.id==='kwAdd'){addKeyword();return}
   if(e.target.id==='filePick'){$('#fileInput').click();return}
-  if(e.target.id==='selMatched'){PREVIEW.forEach(r=>r.checked=r.matched);drawPreview();cloudSavePreview();return}
-  if(e.target.id==='selAll'){PREVIEW.forEach(r=>r.checked=true);drawPreview();cloudSavePreview();return}
-  if(e.target.id==='selNone'){PREVIEW.forEach(r=>r.checked=false);drawPreview();cloudSavePreview();return}
-  if(e.target.id==='importGo'){importSelected();return}
+  const di=e.target.closest('[data-delimp]');
+  if(di){ const ev=S_EVENTS.find(x=>x.id===di.dataset.delimp); deleteImportedEvent(di.dataset.delimp);
+    if(ev) toast(`"${ev.name}" 항목을 학생용 캘린더에서 삭제했습니다.`);
+    return; }
+  if(e.target.id==='manAdd'){addManualEvent();return}
   const ev=e.target.closest('[data-ev2]');
   if(ev){
     if(ev.dataset.kindev==='draft') return;          // 임시 블록은 눌러도 상세를 열지 않음
@@ -2508,9 +2531,6 @@ document.addEventListener('change', e=>{
   if(ld){ const t=byId(ld.dataset.lead);
     if(t){ const link=t.prev.find(p=>p.id===ld.dataset.leadprev);
       if(link){ link.lead=Math.max(0,+ld.value||0); afterMapEdit(); } } return; }
-  /* 지급일 가져오기 미리보기 */
-  const pv=e.target.closest('[data-prev]');
-  if(pv){ PREVIEW[+pv.dataset.prev].checked=pv.checked; drawPreview(); cloudSavePreview(); return; }
   if(e.target.id==='fileInput'){
     const f=e.target.files&&e.target.files[0];
     if(f){ $('#fileName').textContent=f.name; readSheet(f); }
@@ -2577,10 +2597,6 @@ $('#themeBtn').addEventListener('click',()=>{
   setTheme(document.documentElement.dataset.theme==='dark' ? 'light' : 'dark');
 });
 
-document.addEventListener('input', e=>{
-  const pn=e.target.closest('[data-prevname]');
-  if(pn){ PREVIEW[+pn.dataset.prevname].label=pn.value; cloudSavePreview(); }
-});
 /* 파일 끌어다 놓기 */
 (function(){
   const box=$('#fileBox'); if(!box) return;

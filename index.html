@@ -307,13 +307,13 @@ main{padding:20px; max-width:1500px; margin:0 auto}
 .memo-divider{display:flex; align-items:center; gap:7px; margin:14px 0 9px}
 .memo-divider span{font-size:11px; color:var(--ink-3); font-weight:700; white-space:nowrap}
 .memo-divider i{flex:1; height:1px; background:var(--line-soft)}
-/* 방문 현황 */
-.visit{display:grid; grid-template-columns:1fr 1fr; gap:9px}
-.vbox{background:var(--surface-2); border:1px solid var(--line-soft); border-radius:6px;
-  padding:11px 8px; text-align:center}
-.vn{font-size:22px; font-weight:900; letter-spacing:-.5px; line-height:1.1; color:var(--brand);
-  font-variant-numeric:tabular-nums}
-.vl{font-size:11px; color:var(--ink-3); margin-top:3px}
+/* 방문 현황 — 캘린더 상단에 붙는 작은 알약 모양 표시 */
+.visit-pill{display:flex; align-items:center; gap:12px; background:var(--surface-2);
+  border:1px solid var(--line-soft); border-radius:99px; padding:6px 16px 6px 14px}
+.visit-pill .vp-item{display:flex; align-items:baseline; gap:6px; white-space:nowrap}
+.visit-pill .vp-item i{font-style:normal; font-size:10px; font-weight:800; color:var(--ink-3); letter-spacing:.04em}
+.visit-pill .vp-item b{font-size:15px; font-weight:900; color:var(--brand); font-variant-numeric:tabular-nums; letter-spacing:-.3px}
+.visit-pill .vp-sep{width:1px; height:13px; background:var(--line-strong)}
 /* 공개 토글 칩 */
 .pubchip{border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-3);
   font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:99px; white-space:nowrap;
@@ -909,36 +909,27 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 <!-- ═══ 학생용 ═══ -->
 <div class="view" id="v-student" hidden>
   <section class="panel" id="t-cal">
-    <div class="cal-layout">
-      <div class="card">
-        <div class="cal-top">
-          <button class="navbtn" id="sPrevM" aria-label="이전 달">‹</button>
-          <button class="navbtn" id="sNextM" aria-label="다음 달">›</button>
-          <h2 id="sCalTitle"></h2>
-          <button class="today-btn" id="sTodayBtn">오늘</button>
-          <div class="legend" id="sCalLegend"></div>
-          <div class="updated-at" id="sUpdatedAt" title="장학금 지급일 자료를 학생용 캘린더에 마지막으로 올린 시점입니다."></div>
-        </div>
-        <div class="hint">표시된 일정은 예시입니다. 실제 일정은 학교 공지사항을 확인해주세요.</div>
-        <div class="dow"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
-        <div id="sCalBody"></div>
-      </div>
-      <div class="side">
-        <div class="card box" style="margin-bottom:14px">
-          <h3>방문 현황</h3>
-          <div class="visit">
-            <div class="vbox"><div class="vn" id="visitToday">0</div><div class="vl">오늘</div></div>
-            <div class="vbox"><div class="vn" id="visitTotal">0</div><div class="vl">전체</div></div>
-          </div>
-          <p style="font-size:11px;color:var(--ink-3);margin:9px 0 0;line-height:1.6">
-            시제품에서는 이 브라우저 기준으로만 집계됩니다.
-          </p>
-        </div>
-        <div class="card box">
-          <h3>다가오는 일정 <span class="count-chip" id="sUpN">0</span></h3>
-          <div id="sUpList"></div>
+    <div class="card">
+      <div class="cal-top">
+        <button class="navbtn" id="sPrevM" aria-label="이전 달">‹</button>
+        <button class="navbtn" id="sNextM" aria-label="다음 달">›</button>
+        <h2 id="sCalTitle"></h2>
+        <button class="today-btn" id="sTodayBtn">오늘</button>
+        <div class="legend" id="sCalLegend"></div>
+        <div class="updated-at" id="sUpdatedAt" title="장학금 지급일 자료를 학생용 캘린더에 마지막으로 올린 시점입니다."></div>
+        <div class="visit-pill" id="visitPill">
+          <span class="vp-item"><i>TODAY</i><b id="visitToday">0</b></span>
+          <span class="vp-sep"></span>
+          <span class="vp-item"><i>TOTAL</i><b id="visitTotal">0</b></span>
         </div>
       </div>
+      <div class="hint">표시된 일정은 예시입니다. 실제 일정은 학교 공지사항을 확인해주세요.</div>
+      <div class="dow"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+      <div id="sCalBody"></div>
+    </div>
+    <div class="card box upnext">
+      <h3>다가오는 일정 <span class="count-chip" id="sUpN">0</span></h3>
+      <div class="upgrid" id="sUpList"></div>
     </div>
   </section>
 

@@ -1854,16 +1854,29 @@ function publishedTasks(){
     desc:t.publicDesc||'', where:dept(t.dept).name, url:t.publicUrl||'', fromTask:t.id
   }));
 }
-/* 같은 구분·제목·기간의 일정(예: 국가근로장학금 지급이 국고/교비로 나뉘어
-   두 건 등록된 경우)은 학생에게는 헷갈리지 않도록 어디서든 하나로만 표기합니다. */
+/* 이름 끝에 붙은 지급방법 안내(예: "…지급(대출상환 개인지급)")를 걷어내서
+   장학명 자체가 같은지 비교할 때 쓰는 기준 이름을 만듭니다. */
+function dedupBaseName(name){
+  let s=String(name||'').trim();
+  while(/\([^()]*\)\s*$/.test(s)){
+    s=s.replace(/\([^()]*\)\s*$/,'').trim();
+  }
+  return s || String(name||'').trim();
+}
+/* 같은 구분·기간에 장학명이 같은 일정(예: 국가근로장학금 지급이 국고/교비로 나뉜 경우,
+   또는 지급방법(대출상환·개인지급 등)만 다르게 여러 건 올라온 경우)은
+   학생에게는 헷갈리지 않도록 어디서든 하나로만 표기합니다. */
 function dedupEvents(list){
   const seen=new Set();
-  return list.filter(e=>{
-    const key=e.kind+'|'+e.name+'|'+e.start+'|'+e.end;
-    if(seen.has(key)) return false;
+  const out=[];
+  list.forEach(e=>{
+    const base=dedupBaseName(e.name);
+    const key=e.kind+'|'+base+'|'+e.start+'|'+e.end;
+    if(seen.has(key)) return;
     seen.add(key);
-    return true;
+    out.push(base!==e.name ? Object.assign({},e,{name:base}) : e);
   });
+  return out;
 }
 function allStudentEvents(){
   return dedupEvents(S_EVENTS.concat(publishedTasks()).filter(e=>!HIDDEN_IDS.has(e.id)));

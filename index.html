@@ -847,17 +847,18 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 
   <section class="panel" id="s-import" hidden>
     <div class="sec-head"><h2>(학생용 캘린더) 지급일 업로드</h2>
-      <p>결의서 파일을 넣으면 전표번호 앞자리를 지급일로 읽어, 학생용 캘린더에 장학금 지급 예정일을 올립니다.</p></div>
+      <p>결의서 파일을 넣으면 전표번호 앞자리를 지급일로 읽어, 아래 1번에 등록해둔 장학 키워드와 일치하는 항목만 학생용 캘린더 지급 예정일 후보로 올립니다.</p></div>
 
     <div class="linkednote">
       <span class="lk">↳</span>
       <span><b>전표번호 = 지급 예정일</b> — 예를 들어 전표번호가 <b>20260921</b>-000015 이면 <b>2026년 9월 21일</b> 지급으로 자동 인식합니다.
-        전표번호가 아직 없는 행(작성중 등)과, '구분'이 <b>수입·대체</b>인 행(학생에게 나가는 지급이 아닌 항목)은 자동으로 건너뜁니다.</span>
+        전표번호가 아직 없는 행(작성중 등)과, '구분'이 <b>수입·대체</b>인 행(학생에게 나가는 지급이 아닌 항목)은 자동으로 건너뜁니다.
+        <b>또한 1번 '표기할 장학 목록'에 등록된 키워드와 결의제목이 일치하는 행만 미리보기에 나타나고 저장됩니다</b> — 등록되지 않은 다른 결의(타 지출 등)는 화면에 표시되지 않아 다른 담당자·다른 부서에 노출되지 않습니다.</span>
     </div>
 
     <div class="step">
       <div class="step-h"><span class="step-n">1</span><h3>표기할 장학 목록</h3>
-        <span class="sub">여기에 등록해두면 파일을 넣을 때마다 해당 장학만 자동으로 골라집니다.</span></div>
+        <span class="sub">여기에 등록해둔 키워드와 일치하는 결의만 아래 미리보기에 나타납니다. (등록되지 않은 결의는 표시·저장되지 않습니다)</span></div>
       <div class="kwlist" id="kwList"></div>
       <div class="kwform">
         <div class="field"><label for="kwWord">결의제목에 들어가는 말</label>
@@ -2116,7 +2117,8 @@ let KEYWORDS=[
   {id:'K3', word:'교내 고정근로', label:'교내 고정근로장학금 지급', kind:'pay'}
 ];
 let kwSeq=10;
-let PREVIEW=[];   // [{checked, date, label, title, gubun, amount, matched}]
+let PREVIEW=[];   // [{checked, date, label, title, gubun, amount, matched}] — 키워드와 일치하는 행만 담깁니다
+let LAST_ROWS=[]; // 마지막으로 불러온 파일에서 읽은 「지출」 행 전체(키워드 필터 전). 키워드가 추가·삭제되면 여기서 다시 걸러냅니다.
 
 function drawKeywords(){
   $('#kwList').innerHTML = KEYWORDS.length ? KEYWORDS.map(k=>`
@@ -2138,7 +2140,7 @@ function addKeyword(){
   cloudInsertKeyword(k);
   $('#kwWord').value=''; $('#kwLabel').value='';
   drawKeywords();
-  if(PREVIEW.length) applyMatch();
+  if(LAST_ROWS.length) applyMatch();
   toast(`"${w}" 장학을 목록에 추가했습니다.`);
 }
 
@@ -2160,14 +2162,29 @@ function matchKeyword(title){
   const t=String(title||'');
   return KEYWORDS.find(k=>k.word && t.includes(k.word)) || null;
 }
-function applyMatch(){
-  PREVIEW.forEach(r=>{
+/* 등록된 키워드와 일치하는 행만 골라 PREVIEW를 다시 만듭니다.
+   다른 부서 결의 내역까지 화면에 노출되지 않도록, 일치하지 않는 행은
+   미리보기에 아예 나타나지 않고 저장도 되지 않습니다.
+   preserveState가 true면(키워드 추가/삭제 시) 기존에 체크·수정해둔 상태를 최대한 유지합니다. */
+function applyMatch(preserveState){
+  const prevByKey={};
+  if(preserveState!==false){
+    PREVIEW.forEach(r=>{ prevByKey[r.date+'|'+r.title]={checked:r.checked, label:r.label}; });
+  }
+  PREVIEW = LAST_ROWS.map(r=>{
     const k=matchKeyword(r.title);
-    r.matched=!!k;
-    r.kind=k?k.kind:'pay';
-    if(k && k.label) r.label=k.label;
-  });
+    if(!k) return null;
+    const prior=prevByKey[r.date+'|'+r.title];
+    return {
+      date:r.date, title:r.title, gubun:r.gubun, stat:r.stat, amount:r.amount,
+      kind:k.kind||'pay', matched:true,
+      label: prior ? prior.label : (k.label||cleanTitle(r.title)),
+      checked: prior ? prior.checked : true
+    };
+  }).filter(Boolean);
+  PREVIEW.sort((a,b)=>a.date.localeCompare(b.date));
   drawPreview();
+  cloudSavePreview();
 }
 
 function readSheet(file){
@@ -2197,7 +2214,7 @@ function buildPreview(grid){
   const cSlip=col('전표번호'), cTitle=col('결의제목'),
         cAmt=col('결의금액'), cGubun=col('구분'), cStat=col('진행상태');
 
-  PREVIEW=[];
+  LAST_ROWS=[];
   let skippedNonPay=0;
   for(let i=hi+1;i<grid.length;i++){
     const row=grid[i]||[];
@@ -2209,29 +2226,24 @@ function buildPreview(grid){
     /* '수입'(재단·정부에서 학교로 들어오는 돈)과 '대체'(내부 회계 정리)는
        학생에게 나가는 지급일이 아니므로 학생용 캘린더 후보에서 제외합니다. */
     if(cGubun>-1 && gubun!=='지출'){ skippedNonPay++; continue; }
-    PREVIEW.push({
-      checked:false, date, title, label:cleanTitle(title), kind:'pay', matched:false,
-      gubun, stat:String(row[cStat]||'').trim(),
-      amount:String(row[cAmt]||'').trim()
-    });
+    LAST_ROWS.push({ date, title, gubun, stat:String(row[cStat]||'').trim(), amount:String(row[cAmt]||'').trim() });
   }
-  PREVIEW.sort((a,b)=>a.date.localeCompare(b.date));
-  if(!PREVIEW.length){ toast('전표번호가 있는 「지출」 행을 찾지 못했습니다.'); return; }
+  if(!LAST_ROWS.length){ toast('전표번호가 있는 「지출」 행을 찾지 못했습니다.'); PREVIEW=[]; drawPreview(); cloudSavePreview(); return; }
   $('#previewStep').hidden=false;
-  applyMatch();
-  PREVIEW.forEach(r=>{ r.checked=r.matched; });
-  drawPreview();
-  cloudSavePreview();
+  applyMatch(false);   // 새 파일이므로 이전 미리보기 상태는 이어받지 않고 새로 만듭니다
   const skipNote = skippedNonPay ? ` (수입·대체 ${skippedNonPay}건은 지급일이 아니라서 제외)` : '';
-  toast(`${PREVIEW.length}건을 읽었습니다. 등록한 장학 ${PREVIEW.filter(r=>r.matched).length}건이 자동 선택되었습니다.${skipNote}`);
+  if(!PREVIEW.length){
+    toast(`파일에서 ${LAST_ROWS.length}건을 읽었지만, 등록한 장학 키워드와 일치하는 결의가 없습니다. 위 1번 목록에 키워드를 등록해주세요.${skipNote}`);
+  }else{
+    toast(`등록한 장학과 일치하는 ${PREVIEW.length}건을 찾아 모두 선택했습니다.${skipNote}`);
+  }
 }
 function drawPreview(){
   $('#prevRows').innerHTML=PREVIEW.map((r,i)=>`
     <tr class="${r.checked?'picked':''}">
       <td><input type="checkbox" data-prev="${i}" ${r.checked?'checked':''} style="width:15px;height:15px;accent-color:#2F7BC8"></td>
       <td class="num">${r.date}</td>
-      <td><input class="tname" data-prevname="${i}" value="${esc(r.label)}">
-        ${r.matched?'<div style="margin-top:4px"><span class="matched">등록한 장학</span></div>':''}</td>
+      <td><input class="tname" data-prevname="${i}" value="${esc(r.label)}"></td>
       <td style="font-size:11.5px;color:var(--ink-3)">${esc(r.title)}</td>
       <td style="font-size:11.5px">${esc(r.gubun)}</td>
       <td class="num">${esc(r.amount)}</td>
@@ -2379,7 +2391,7 @@ document.addEventListener('click',e=>{
   if(e.target.id==='printBtn'){window.print();return}
   /* 지급일 가져오기 */
   const kd=e.target.closest('[data-kwdel]');
-  if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId); drawKeywords(); if(PREVIEW.length) applyMatch(); return; }
+  if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId); drawKeywords(); if(LAST_ROWS.length) applyMatch(); return; }
   if(e.target.id==='kwAdd'){addKeyword();return}
   if(e.target.id==='filePick'){$('#fileInput').click();return}
   if(e.target.id==='selMatched'){PREVIEW.forEach(r=>r.checked=r.matched);drawPreview();cloudSavePreview();return}

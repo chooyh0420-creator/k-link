@@ -1181,10 +1181,13 @@ async function initCloudSync(){
         try{
           const saved=JSON.parse(metaMap.preview_state);
           if(saved && Array.isArray(saved.rows) && saved.rows.length){
-            PREVIEW=saved.rows;
+            /* 저장된 시점 이후 다른 담당자가 키워드를 지웠을 수도 있으므로,
+               불러올 때마다 지금 등록된 키워드 기준으로 다시 한 번 걸러서 보여줍니다. */
+            PREVIEW=saved.rows.filter(r=>matchKeyword(r.title));
             if($('#fileName')) $('#fileName').textContent=saved.fileName||'';
             if($('#previewStep')) $('#previewStep').hidden=false;
             drawPreview();
+            if(PREVIEW.length!==saved.rows.length) cloudSavePreview();
           }
         }catch(_){ /* 저장된 미리보기 형식이 깨졌으면 무시 */ }
       }
@@ -2391,7 +2394,11 @@ document.addEventListener('click',e=>{
   if(e.target.id==='printBtn'){window.print();return}
   /* 지급일 가져오기 */
   const kd=e.target.closest('[data-kwdel]');
-  if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId); drawKeywords(); if(LAST_ROWS.length) applyMatch(); return; }
+  if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId); drawKeywords();
+    if(LAST_ROWS.length){ applyMatch(); }
+    else { const before=PREVIEW.length; PREVIEW=PREVIEW.filter(r=>matchKeyword(r.title));
+      if(PREVIEW.length!==before){ drawPreview(); cloudSavePreview(); } }
+    return; }
   if(e.target.id==='kwAdd'){addKeyword();return}
   if(e.target.id==='filePick'){$('#fileInput').click();return}
   if(e.target.id==='selMatched'){PREVIEW.forEach(r=>r.checked=r.matched);drawPreview();cloudSavePreview();return}

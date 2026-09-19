@@ -851,7 +851,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
     <div class="linkednote">
       <span class="lk">↳</span>
       <span><b>전표번호 = 지급 예정일</b> — 예를 들어 전표번호가 <b>20260921</b>-000015 이면 <b>2026년 9월 21일</b> 지급으로 자동 인식합니다.
-        전표번호가 아직 없는 행(작성중 등)은 건너뜁니다.</span>
+        전표번호가 아직 없는 행(작성중 등)과, '구분'이 <b>수입·대체</b>인 행(학생에게 나가는 지급이 아닌 항목)은 자동으로 건너뜁니다.</span>
     </div>
 
     <div class="step">
@@ -2073,25 +2073,31 @@ function buildPreview(grid){
         cAmt=col('결의금액'), cGubun=col('구분'), cStat=col('진행상태');
 
   PREVIEW=[];
+  let skippedNonPay=0;
   for(let i=hi+1;i<grid.length;i++){
     const row=grid[i]||[];
     const date=slipToDate(row[cSlip]);
     if(!date) continue;                       // 전표번호 없는 행은 제외
     const title=String(row[cTitle]||'').trim();
     if(!title) continue;
+    const gubun=cGubun>-1 ? String(row[cGubun]||'').trim() : '';
+    /* '수입'(재단·정부에서 학교로 들어오는 돈)과 '대체'(내부 회계 정리)는
+       학생에게 나가는 지급일이 아니므로 학생용 캘린더 후보에서 제외합니다. */
+    if(cGubun>-1 && gubun!=='지출'){ skippedNonPay++; continue; }
     PREVIEW.push({
       checked:false, date, title, label:cleanTitle(title), kind:'pay', matched:false,
-      gubun:String(row[cGubun]||'').trim(), stat:String(row[cStat]||'').trim(),
+      gubun, stat:String(row[cStat]||'').trim(),
       amount:String(row[cAmt]||'').trim()
     });
   }
   PREVIEW.sort((a,b)=>a.date.localeCompare(b.date));
-  if(!PREVIEW.length){ toast('전표번호가 있는 행을 찾지 못했습니다.'); return; }
+  if(!PREVIEW.length){ toast('전표번호가 있는 「지출」 행을 찾지 못했습니다.'); return; }
   $('#previewStep').hidden=false;
   applyMatch();
   PREVIEW.forEach(r=>{ r.checked=r.matched; });
   drawPreview();
-  toast(`${PREVIEW.length}건을 읽었습니다. 등록한 장학 ${PREVIEW.filter(r=>r.matched).length}건이 자동 선택되었습니다.`);
+  const skipNote = skippedNonPay ? ` (수입·대체 ${skippedNonPay}건은 지급일이 아니라서 제외)` : '';
+  toast(`${PREVIEW.length}건을 읽었습니다. 등록한 장학 ${PREVIEW.filter(r=>r.matched).length}건이 자동 선택되었습니다.${skipNote}`);
 }
 function drawPreview(){
   $('#prevRows').innerHTML=PREVIEW.map((r,i)=>`

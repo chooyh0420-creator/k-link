@@ -1130,6 +1130,18 @@ async function cloudSetMeta(key, value){
     if(error) console.warn('클라우드 저장 실패(메타):', error.message); }
   catch(err){ console.warn('클라우드 저장 실패(메타):', err); }
 }
+let previewSaveTimer=null;
+/* 지급일 업로드 미리보기(파일을 넣고 확인하는 3단계 화면)도 새로고침하거나
+   나중에 다시 열어도 남아있도록 저장합니다. 새 파일을 올리면 이전 미리보기를
+   자동으로 덮어씁니다. */
+function cloudSavePreview(){
+  if(!sb) return;
+  clearTimeout(previewSaveTimer);
+  previewSaveTimer=setTimeout(()=>{
+    const fileName = $('#fileName') ? $('#fileName').textContent : '';
+    cloudSetMeta('preview_state', JSON.stringify({fileName, rows:PREVIEW}));
+  }, 400);
+}
 /* 페이지를 처음 열 때: DB에 저장된 지급일 일정·키워드·업데이트 시각을 불러와
    화면에 반영합니다. DB에 아무것도 없는 최초 1회에는 기본 키워드 3개를 심어둡니다. */
 async function initCloudSync(){
@@ -1138,7 +1150,7 @@ async function initCloudSync(){
     const [evRes, kwRes, metaRes] = await Promise.all([
       sb.from('klink_student_events').select('*').order('start_date'),
       sb.from('klink_pay_keywords').select('*').order('created_at'),
-      sb.from('klink_meta').select('*').eq('key','pay_updated_at')
+      sb.from('klink_meta').select('*')
     ]);
     if(evRes.data && evRes.data.length){
       const known=new Set(S_EVENTS.map(e=>e.id));
@@ -1157,9 +1169,24 @@ async function initCloudSync(){
     }else{
       KEYWORDS.forEach(k=>cloudInsertKeyword(k));
     }
-    if(metaRes.data && metaRes.data.length && metaRes.data[0].value){
-      PAY_UPDATED_AT = metaRes.data[0].value;
-      try{ localStorage.setItem('klink_pay_updated_at', PAY_UPDATED_AT); }catch(_){}
+    if(metaRes.data && metaRes.data.length){
+      const metaMap={};
+      metaRes.data.forEach(r=>{ metaMap[r.key]=r.value; });
+      if(metaMap.pay_updated_at){
+        PAY_UPDATED_AT = metaMap.pay_updated_at;
+        try{ localStorage.setItem('klink_pay_updated_at', PAY_UPDATED_AT); }catch(_){}
+      }
+      if(metaMap.preview_state){
+        try{
+          const saved=JSON.parse(metaMap.preview_state);
+          if(saved && Array.isArray(saved.rows) && saved.rows.length){
+            PREVIEW=saved.rows;
+            if($('#fileName')) $('#fileName').textContent=saved.fileName||'';
+            if($('#previewStep')) $('#previewStep').hidden=false;
+            drawPreview();
+          }
+        }catch(_){ /* 저장된 미리보기 형식이 깨졌으면 무시 */ }
+      }
     }
   }catch(err){
     console.warn('클라우드 동기화 실패, 이 브라우저 메모리 데이터로만 표시합니다:', err);
@@ -2194,6 +2221,7 @@ function buildPreview(grid){
   applyMatch();
   PREVIEW.forEach(r=>{ r.checked=r.matched; });
   drawPreview();
+  cloudSavePreview();
   const skipNote = skippedNonPay ? ` (수입·대체 ${skippedNonPay}건은 지급일이 아니라서 제외)` : '';
   toast(`${PREVIEW.length}건을 읽었습니다. 등록한 장학 ${PREVIEW.filter(r=>r.matched).length}건이 자동 선택되었습니다.${skipNote}`);
 }
@@ -2225,6 +2253,7 @@ function importSelected(){
   markPayUpdated();
   cloudInsertEvents(added);
   drawPreview(); drawStudent();
+  cloudSavePreview();
 }
 
 /* ===== 모드 · 탭 ===== */
@@ -2353,9 +2382,9 @@ document.addEventListener('click',e=>{
   if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId); drawKeywords(); if(PREVIEW.length) applyMatch(); return; }
   if(e.target.id==='kwAdd'){addKeyword();return}
   if(e.target.id==='filePick'){$('#fileInput').click();return}
-  if(e.target.id==='selMatched'){PREVIEW.forEach(r=>r.checked=r.matched);drawPreview();return}
-  if(e.target.id==='selAll'){PREVIEW.forEach(r=>r.checked=true);drawPreview();return}
-  if(e.target.id==='selNone'){PREVIEW.forEach(r=>r.checked=false);drawPreview();return}
+  if(e.target.id==='selMatched'){PREVIEW.forEach(r=>r.checked=r.matched);drawPreview();cloudSavePreview();return}
+  if(e.target.id==='selAll'){PREVIEW.forEach(r=>r.checked=true);drawPreview();cloudSavePreview();return}
+  if(e.target.id==='selNone'){PREVIEW.forEach(r=>r.checked=false);drawPreview();cloudSavePreview();return}
   if(e.target.id==='importGo'){importSelected();return}
   const ev=e.target.closest('[data-ev2]');
   if(ev){
@@ -2462,7 +2491,7 @@ document.addEventListener('change', e=>{
       if(link){ link.lead=Math.max(0,+ld.value||0); afterMapEdit(); } } return; }
   /* 지급일 가져오기 미리보기 */
   const pv=e.target.closest('[data-prev]');
-  if(pv){ PREVIEW[+pv.dataset.prev].checked=pv.checked; drawPreview(); return; }
+  if(pv){ PREVIEW[+pv.dataset.prev].checked=pv.checked; drawPreview(); cloudSavePreview(); return; }
   if(e.target.id==='fileInput'){
     const f=e.target.files&&e.target.files[0];
     if(f){ $('#fileName').textContent=f.name; readSheet(f); }
@@ -2531,7 +2560,7 @@ $('#themeBtn').addEventListener('click',()=>{
 
 document.addEventListener('input', e=>{
   const pn=e.target.closest('[data-prevname]');
-  if(pn){ PREVIEW[+pn.dataset.prevname].label=pn.value; }
+  if(pn){ PREVIEW[+pn.dataset.prevname].label=pn.value; cloudSavePreview(); }
 });
 /* 파일 끌어다 놓기 */
 (function(){

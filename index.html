@@ -231,13 +231,25 @@ h1,h2,h3,h4{margin:0; font-weight:700; line-height:1.35}
   font-size:11.5px; font-weight:900; display:flex; align-items:center; justify-content:center}
 .step-h h3{font-size:14px}
 .step-h .sub{font-size:12px; color:var(--ink-3)}
-.kwlist{display:flex; gap:7px; flex-wrap:wrap; margin-bottom:11px}
-.kw{display:inline-flex; align-items:center; gap:7px; background:var(--surface-2);
-  border:1px solid var(--line); border-radius:99px; padding:5px 7px 5px 12px; font-size:12px}
-.kw b{font-weight:700; color:var(--ink)}
-.kw .as{color:var(--ink-3); font-size:11px}
-.kw .kd{border:0; background:transparent; color:var(--ink-3); font-size:11px; padding:1px 4px; border-radius:4px}
+.kwlist{display:flex; flex-direction:column; border:1px solid var(--line); border-radius:var(--radius);
+  background:var(--surface); overflow:hidden; margin-bottom:11px}
+.kwlist .kwempty{padding:16px 14px; font-size:12px; color:var(--ink-3); text-align:center; background:var(--surface-2)}
+.kw{display:flex; align-items:center; gap:10px; background:var(--surface);
+  border-bottom:1px solid var(--line-soft); padding:9px 14px; font-size:12.5px}
+.kw:last-child{border-bottom:0}
+.kw b{font-weight:700; color:var(--ink); flex:none; min-width:150px; max-width:220px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.kw .arrow{color:var(--ink-3); flex:none}
+.kw .as{color:var(--ink-2); font-size:12px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.kw .kind-tag{flex:none; font-size:10.5px; font-weight:700; color:var(--brand); background:var(--brand-soft);
+  border-radius:99px; padding:2px 9px}
+.kw .kd{flex:none; border:0; background:transparent; color:var(--ink-3); font-size:13px; padding:3px 7px;
+  border-radius:6px; cursor:pointer; line-height:1}
 .kw .kd:hover{background:var(--s-late-bg); color:var(--s-late)}
+@media (max-width:560px){
+  .kw{flex-wrap:wrap}
+  .kw b{max-width:none; white-space:normal}
+}
 .kwform{display:grid; grid-template-columns:1.1fr 1.1fr 90px auto; gap:8px; align-items:end}
 @media (max-width:820px){.kwform{grid-template-columns:1fr}}
 .kwform .field{margin:0}
@@ -334,6 +346,11 @@ main{padding:20px; max-width:1500px; margin:0 auto}
   padding:7px 14px; border-radius:6px; font-size:12.5px; font-weight:700}
 .today-btn:hover{border-color:var(--brand); color:var(--brand)}
 .legend{margin-left:auto; display:flex; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-2)}
+.updated-at{display:flex; align-items:center; gap:6px; padding-left:12px; margin-left:4px;
+  border-left:1px solid var(--line); font-size:11px; color:var(--ink-3); white-space:nowrap}
+.updated-at .dot{flex:none; width:6px; height:6px; border-radius:50%; background:var(--brand)}
+.updated-at b{color:var(--ink-2); font-weight:700}
+@media (max-width:640px){.updated-at{border-left:0; padding-left:0; margin-left:0; width:100%; order:9}}
 .legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px}
 .hint{font-size:11.5px; color:var(--ink-3); padding:8px 16px; border-bottom:1px solid var(--line-soft); background:var(--surface-2)}
 .dow{display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid var(--line); background:var(--surface-2)}
@@ -898,6 +915,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
           <h2 id="sCalTitle"></h2>
           <button class="today-btn" id="sTodayBtn">오늘</button>
           <div class="legend" id="sCalLegend"></div>
+          <div class="updated-at" id="sUpdatedAt" title="장학금 지급일 자료를 학생용 캘린더에 마지막으로 올린 시점입니다."></div>
         </div>
         <div class="hint">표시된 일정은 예시입니다. 실제 일정은 학교 공지사항을 확인해주세요.</div>
         <div class="dow"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
@@ -1051,6 +1069,21 @@ const S_KIND=[
  {id:'apply',name:'신청',color:'#14386E'},{id:'pay',name:'지급',color:'#116454'},
  {id:'notice',name:'발표',color:'#67408E'},{id:'due',name:'납부·마감',color:'#B22A24'}
 ];
+/* 학생용 캘린더에 지급일 자료를 마지막으로 올린 시점(자료 신뢰도 표시용) */
+let PAY_UPDATED_AT=null;
+try{ PAY_UPDATED_AT = localStorage.getItem('klink_pay_updated_at'); }catch(_){}
+function markPayUpdated(){
+  PAY_UPDATED_AT = new Date().toISOString();
+  try{ localStorage.setItem('klink_pay_updated_at', PAY_UPDATED_AT); }catch(_){}
+  drawUpdatedAt();
+}
+function drawUpdatedAt(){
+  const el=$('#sUpdatedAt'); if(!el) return;
+  if(!PAY_UPDATED_AT){ el.innerHTML='<span class="dot" style="background:var(--ink-3)"></span>자료 업데이트 전'; return; }
+  const d=new Date(PAY_UPDATED_AT);
+  const txt=isNaN(d) ? '' : d.toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  el.innerHTML=`<span class="dot"></span>자료 업데이트 <b>${esc(txt)}</b>`;
+}
 const S_EVENTS=[
  {id:'S1',kind:'apply',name:'2027-1학기 국가장학금 1차 신청',start:'2026-11-20',end:'2026-12-27',
   desc:'한국장학재단 홈페이지에서 신청합니다. 가구원 동의와 서류 제출까지 마쳐야 신청이 완료됩니다.',where:'한국장학재단'},
@@ -1733,6 +1766,7 @@ const studentEvents=()=>{
 function drawStudent(){
   renderCalendar($('#sCalBody'),$('#sCalTitle'),sCalY,sCalM,studentEvents(),true,'+ 추가');
   $('#sCalLegend').innerHTML=S_KIND.map(k=>`<span><i style="background:${k.color}"></i>${k.name}</span>`).join('');
+  drawUpdatedAt();
   const up=allStudentEvents().filter(e=>e.end>=TODAY).sort((a,b)=>a.start.localeCompare(b.start)).slice(0,6);
   $('#sUpN').textContent=up.length;
   $('#sUpList').innerHTML=up.length?up.map(e=>{
@@ -1963,11 +1997,13 @@ let PREVIEW=[];   // [{checked, date, label, title, gubun, amount, matched}]
 
 function drawKeywords(){
   $('#kwList').innerHTML = KEYWORDS.length ? KEYWORDS.map(k=>`
-    <span class="kw"><b>${esc(k.word)}</b>
-      ${k.label?`<span class="as">→ ${esc(k.label)}</span>`:''}
-      <span class="as">· ${esc(kind(k.kind).name)}</span>
-      <button class="kd" data-kwdel="${k.id}" title="삭제">✕</button></span>`).join('')
-    : '<span style="font-size:12px;color:var(--ink-3)">아직 등록한 장학이 없습니다. 아래에서 추가해주세요.</span>';
+    <div class="kw">
+      <b>${esc(k.word)}</b>
+      ${k.label?`<span class="arrow">→</span><span class="as">${esc(k.label)}</span>`:'<span class="as">→ 결의제목 그대로 표시</span>'}
+      <span class="kind-tag">${esc(kind(k.kind).name)}</span>
+      <button class="kd" data-kwdel="${k.id}" title="삭제">✕</button>
+    </div>`).join('')
+    : '<div class="kwempty">아직 등록한 장학이 없습니다. 아래에서 추가해주세요.</div>';
   const sel=$('#kwKind');
   if(sel && !sel.options.length) sel.innerHTML=S_KIND.map(k=>`<option value="${k.id}" ${k.id==='pay'?'selected':''}>${esc(k.name)}</option>`).join('');
 }
@@ -2080,6 +2116,7 @@ function importSelected(){
   });
   toast(`${picks.length}건을 학생용 캘린더에 올렸습니다.`);
   PREVIEW.forEach(r=>{ r.checked=false; });
+  markPayUpdated();
   drawPreview(); drawStudent();
 }
 

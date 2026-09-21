@@ -585,6 +585,10 @@ th{color:var(--ink-3); font-weight:700; font-size:11.5px; background:var(--surfa
 td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)}
 .tbl-wrap{overflow-x:auto; border:1px solid var(--line-soft); border-radius:var(--radius);
   background:var(--surface); box-shadow:var(--shadow)}
+.past-toggle-row td{padding:0}
+.past-toggle{display:block; width:100%; background:var(--surface-2); border:0; border:none;
+  padding:10px 11px; font-size:12.5px; font-weight:700; color:var(--ink-3); cursor:pointer; text-align:center; font-family:inherit}
+.past-toggle:hover{background:var(--line-soft); color:var(--ink-2)}
 .filters{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px}
 .chip{font-size:12.5px; padding:6px 13px; border-radius:99px; border:1px solid var(--line-strong);
   background:var(--surface); color:var(--ink-2); font-weight:500}
@@ -1932,7 +1936,7 @@ attachDrag($('#calBody'), (a,b)=>{
   const anchor=anchorForDraft($('#calBody'),'__draft',a);
   if(anchor) openNewQuick(a,b,anchor);
 });
-let sCalY=+TODAY.slice(0,4), sCalM=+TODAY.slice(5,7)-1, sFilter='all';
+let sCalY=+TODAY.slice(0,4), sCalM=+TODAY.slice(5,7)-1, sFilter='all', sPastOpen=false;
 let sSeq=100;
 /* 직원용에서 '학생 공개'를 켠 업무를 학생 일정으로 변환합니다.
    같은 데이터를 쓰되, 학생에게는 공개용 이름·안내만 보입니다. */
@@ -2005,10 +2009,21 @@ function drawStudent(){
   $('#sChips').innerHTML=[{id:'all',name:'전체'}].concat(S_KIND)
     .map(k=>`<button class="chip" data-skind="${k.id}" aria-pressed="${k.id===sFilter}">${esc(k.name)}</button>`).join('');
   const rows=filteredStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter).sort((a,b)=>a.start.localeCompare(b.start));
-  $('#sRows').innerHTML=rows.map(e=>`<tr>
+  const rowHtml=e=>`<tr>
     <td><span class="st" style="color:${kind(e.kind).color};background:var(--surface-2)">${esc(kind(e.kind).name)}</span></td>
     <td><button class="link" data-ev2="${e.id}" data-kindev="sev" style="border:0;background:none;padding:0;font-weight:700;color:var(--brand)">${esc(e.name)}</button></td>
-    <td class="num">${e.start===e.end?e.start:`${e.start} ~ ${e.end}`}</td></tr>`).join('');
+    <td class="num">${e.start===e.end?e.start:`${e.start} ~ ${e.end}`}</td></tr>`;
+  const pastRows=rows.filter(e=>e.end<TODAY), upRows=rows.filter(e=>e.end>=TODAY);
+  let rowsHtml='';
+  if(pastRows.length){
+    rowsHtml+=`<tr class="past-toggle-row"><td colspan="3">
+      <button class="past-toggle" data-pasttoggle aria-expanded="${sPastOpen}">
+        ${sPastOpen?'▲ 지난 일정 숨기기':`▼ 지난 일정 보기 (${pastRows.length}건)`}
+      </button></td></tr>`;
+    if(sPastOpen) rowsHtml+=pastRows.map(rowHtml).join('');
+  }
+  rowsHtml+=upRows.map(rowHtml).join('');
+  $('#sRows').innerHTML=rowsHtml || '<tr><td colspan="3" class="empty">표시할 일정이 없습니다.</td></tr>';
 }
 
 /* 학생용 캘린더는 열람 전용입니다. 일정을 학생용 캘린더에 반영하려면
@@ -2536,6 +2551,7 @@ document.addEventListener('click',e=>{
   const tk=e.target.closest('[data-task]'); if(tk&&!tk.id){openTask(tk.dataset.task);return}
   const dc=e.target.closest('[data-dept]'); if(dc){deptFilter=dc.dataset.dept;drawDeptChips();drawDeptRows();return}
   const sk=e.target.closest('[data-skind]'); if(sk){sFilter=sk.dataset.skind;drawStudent();return}
+  const ptg=e.target.closest('[data-pasttoggle]'); if(ptg){sPastOpen=!sPastOpen;drawStudent();return}
   if(!$('#quickpop').hidden && !justDragged && !e.target.closest('#quickpop')
      && !e.target.closest('[data-newday]') && !e.target.closest('#calBody')){
     closeQuickpop();

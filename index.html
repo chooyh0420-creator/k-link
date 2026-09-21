@@ -1202,6 +1202,18 @@ async function cloudSetMeta(key, value){
 function persistExcludeKeywords(){
   cloudSetMeta('exclude_keywords', JSON.stringify(EXCLUDE_KEYWORDS));
 }
+/* 업무 캘린더·부서별 업무·연결 지도·변경 이력·메모(TASKS/FLOWS/HISTORY/MEMOS)를
+   통째로 클라우드에 저장합니다. 화면에서 뭔가 바뀔 때마다(클릭·입력·드래그 등)
+   0.7초 후 한 번만 저장하도록 묶어서(디바운스) 서버에 너무 자주 요청하지 않게 합니다. */
+let staffSaveTimer=null;
+function scheduleStaffSave(){
+  clearTimeout(staffSaveTimer);
+  staffSaveTimer=setTimeout(persistStaffData, 700);
+}
+function persistStaffData(){
+  const snapshot={TASKS, FLOWS, HISTORY, MEMOS, seq, flowSeq, memoSeq, replySeq};
+  cloudSetMeta('staff_data', JSON.stringify(snapshot));
+}
 /* 지급일 업로드로 반영된 항목을 '삭제'하면 실제로는 이 목록(hidden_event_ids)에
    id를 추가해 화면(캘린더·목록 어디서든)에서만 숨깁니다. 되돌릴 수 있게 원본
    데이터는 그대로 두는 방식이라, 실수로 지웠을 때도 안전하게 복구할 수 있습니다. */
@@ -1252,12 +1264,29 @@ async function initCloudSync(){
     }else{
       persistExcludeKeywords(); // 클라우드에 아직 없으면 기본 규칙을 최초 1회 저장해둡니다.
     }
+    if(metaMap.staff_data){
+      try{
+        const snap=JSON.parse(metaMap.staff_data);
+        if(snap && typeof snap==='object'){
+          if(Array.isArray(snap.TASKS)) TASKS=snap.TASKS;
+          if(Array.isArray(snap.FLOWS)){ FLOWS.length=0; FLOWS.push(...snap.FLOWS); }
+          if(Array.isArray(snap.HISTORY)) HISTORY=snap.HISTORY;
+          if(Array.isArray(snap.MEMOS)) MEMOS=snap.MEMOS;
+          if(typeof snap.seq==='number') seq=Math.max(seq, snap.seq);
+          if(typeof snap.flowSeq==='number') flowSeq=Math.max(flowSeq, snap.flowSeq);
+          if(typeof snap.memoSeq==='number') memoSeq=Math.max(memoSeq, snap.memoSeq);
+          if(typeof snap.replySeq==='number') replySeq=Math.max(replySeq, snap.replySeq);
+        }
+      }catch(_){ /* 무시 */ }
+    }
   }catch(err){
     console.warn('클라우드 동기화 실패, 이 브라우저 메모리 데이터로만 표시합니다:', err);
   }
   drawKeywords();
   drawExcludeKeywords();
   drawImportedList();
+  drawMemos();
+  drawImpactSel();
   if(mode==='student'){ drawStudent(); } else if(mode==='staff'){ drawStaff(); }
 }
 const S_EVENTS=[];
@@ -1520,6 +1549,7 @@ document.addEventListener('dragover', e=>{
   card.classList.add(left?'over-l':'over-r');
 });
 document.addEventListener('drop', e=>{
+  (function(e){
   if(!dragCardId) return;
   const card=e.target.closest('[data-card]');
   if(!card || card.dataset.flow!==dragCardFlow) return;
@@ -1534,6 +1564,8 @@ document.addEventListener('drop', e=>{
   f.order.splice(to,0,dragCardId);
   relink(f); afterMapEdit();
   toast('순서를 바꾸고 선행·후속 관계를 다시 이었습니다.');
+  })(e);
+  scheduleStaffSave();
 });
 function drawDeptChips(){
   $('#deptChips').innerHTML=DEPTS.map(d=>`<button class="chip" data-dept="${d.id}" aria-pressed="${d.id===deptFilter}">${esc(d.name)}</button>`).join('');
@@ -2537,6 +2569,7 @@ $('#tabBar').addEventListener('click',e=>{
   TABS[mode].forEach(([id])=>{$('#'+id).hidden=id!==tab.dataset.p});
 });
 document.addEventListener('click',e=>{
+  (function(e){
   /* 연결 지도 편집 */
   const ac=e.target.closest('[data-addcard]'); if(ac){addCardToFlow(ac.dataset.addcard);return}
   const dc2=e.target.closest('[data-delcard]'); if(dc2){deleteCard(dc2.dataset.delcard);return}
@@ -2598,15 +2631,21 @@ document.addEventListener('click',e=>{
      && !e.target.closest('[data-newday]') && !e.target.closest('#calBody')){
     closeQuickpop();
   }
+  })(e);
+  scheduleStaffSave();
 });
 $('#scrim').addEventListener('click',closeDrawer);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeQuickpop()}});
 $('#quickpop').addEventListener('click',e=>{
+  (function(e){
   if(e.target.id==='qpX'||e.target.id==='qpX2'){closeQuickpop();return}
   if(e.target.id==='qpSave'){saveQuick();return}
   if(e.target.id==='qpMore'){openNewFull();return}
+  })(e);
+  scheduleStaffSave();
 });
 $('#drawer').addEventListener('change',e=>{
+  (function(e){
   if(e.target.id==='nfPubOn'){ $('#nfPubFields').hidden=!e.target.checked; return; }
   const po=e.target.closest('[data-pubon]');
   if(po){
@@ -2619,8 +2658,11 @@ $('#drawer').addEventListener('change',e=>{
   }
   const c=e.target.closest('[data-chk]');
   if(c){const t=byId($('#drawer').dataset.task);if(t){t.criteria[+c.dataset.chk][1]=c.checked;openTask(t.id);drawStaff()}}
+  })(e);
+  scheduleStaffSave();
 });
 $('#drawer').addEventListener('click',e=>{
+  (function(e){
   if(e.target.id==='drClose'||e.target.id==='nfCancel'){closeDrawer();return}
   if(e.target.id==='nfSave'){saveNewFull();return}
   if(e.target.id==='pubSave'){
@@ -2641,6 +2683,8 @@ $('#drawer').addEventListener('click',e=>{
       t.status=ns;toast('상태를 저장했습니다.');drawStaff();openTask(t.id);
     }
   }
+  })(e);
+  scheduleStaffSave();
 });
 function shiftMonth(w,n){
   if(w==='staff'){calM+=n;if(calM<0){calM=11;calY--}if(calM>11){calM=0;calY++}drawStaffCal()}
@@ -2654,10 +2698,11 @@ $('#sNextM').onclick=()=>shiftMonth('student',1);
 $('#sTodayBtn').onclick=()=>{sCalY=+TODAY.slice(0,4);sCalM=+TODAY.slice(5,7)-1;drawStudent()};
 $('#impTask').addEventListener('change',syncImpDate);
 $('#impCalc').addEventListener('click',showImpact);
-$('#impApply').addEventListener('click',applyImpact);
+$('#impApply').addEventListener('click',e=>{ applyImpact(e); scheduleStaffSave(); });
 
 /* 연결 지도 인라인 편집 저장 */
 document.addEventListener('change', e=>{
+  (function(e){
   const sd=e.target.closest('[data-setdept]');
   if(sd){ const t=byId(sd.dataset.setdept); if(t){ t.dept=sd.value; afterMapEdit(); } return; }
   const st=e.target.closest('[data-setst]');
@@ -2703,8 +2748,11 @@ document.addEventListener('change', e=>{
     }
     return;
   }
+  })(e);
+  scheduleStaffSave();
 });
 document.addEventListener('blur', e=>{
+  (function(e){
   const en=e.target.closest && e.target.closest('[data-editname]');
   if(en){ const t=byId(en.dataset.editname);
     if(t){ const v=en.textContent.trim();
@@ -2718,8 +2766,11 @@ document.addEventListener('blur', e=>{
   if(efn){ const f=FLOWS.find(x=>x.id===efn.dataset.editflownote);
     if(f){ const v=efn.textContent.trim(); f.note=(v==='설명 추가')?'':v; }
     return; }
+  })(e);
+  scheduleStaffSave();
 }, true);
 document.addEventListener('keydown', e=>{
+  (function(e){
   if(e.key==='Enter' && e.target.id==='replyInput'){
     e.preventDefault();
     const btn=document.querySelector('[data-replysave]');
@@ -2729,6 +2780,8 @@ document.addEventListener('keydown', e=>{
   if(e.key==='Enter' && e.target.closest && e.target.closest('[contenteditable]')){
     e.preventDefault(); e.target.blur();
   }
+  })(e);
+  scheduleStaffSave();
 });
 
 /* 화면 색 — 직원용·학생용을 따로 기억합니다 */

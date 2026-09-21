@@ -742,6 +742,13 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   .mtab .ic{width:14px; height:14px}
   .mtab[aria-selected="true"]{padding-top:6px; padding-bottom:10px}
   .strip-note{order:3; width:100%; margin-left:0; padding:4px 2px 8px; font-size:11px}
+
+  /* 장학금 일정 전체보기 표 — 좁은 화면에서 '장학금' 열이 한두 글자씩 세로로 깨지는 문제 방지 */
+  .stbl-list table{table-layout:fixed}
+  .stbl-list th:nth-child(1), .stbl-list td:nth-child(1){width:28%}
+  .stbl-list th:nth-child(2), .stbl-list td:nth-child(2){width:45%}
+  .stbl-list th:nth-child(3), .stbl-list td:nth-child(3){width:27%}
+  .stbl-list td.num{white-space:normal}
 }
 </style>
 </head>
@@ -1003,8 +1010,8 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
     <div class="sec-head"><h2>장학금 일정 전체보기</h2>
       <p>신청 기간과 지급 예정일을 한 번에 확인할 수 있습니다.</p></div>
     <div class="filters" id="sChips"></div>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>구분</th><th>장학금</th><th>기간 / 일자</th><th>안내</th></tr></thead>
+    <div class="tbl-wrap stbl-list"><table>
+      <thead><tr><th>구분</th><th>장학금</th><th>기간 / 일자</th></tr></thead>
       <tbody id="sRows"></tbody></table></div>
   </section>
 </div>
@@ -2001,8 +2008,7 @@ function drawStudent(){
   $('#sRows').innerHTML=rows.map(e=>`<tr>
     <td><span class="st" style="color:${kind(e.kind).color};background:var(--surface-2)">${esc(kind(e.kind).name)}</span></td>
     <td><button class="link" data-ev2="${e.id}" data-kindev="sev" style="border:0;background:none;padding:0;font-weight:700;color:var(--brand)">${esc(e.name)}</button></td>
-    <td class="num">${e.start===e.end?e.start:`${e.start} ~ ${e.end}`}</td>
-    <td>${esc(e.desc||'')}${e.url?`<br><a href="${esc(e.url)}" target="_blank" rel="noopener" style="color:var(--brand);font-size:11.5px;font-weight:700">바로가기 ↗</a>`:''}</td></tr>`).join('');
+    <td class="num">${e.start===e.end?e.start:`${e.start} ~ ${e.end}`}</td></tr>`).join('');
 }
 
 /* 학생용 캘린더는 열람 전용입니다. 일정을 학생용 캘린더에 반영하려면

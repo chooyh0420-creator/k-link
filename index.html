@@ -291,7 +291,7 @@ tr.picked{background:color-mix(in srgb, var(--brand) 5%, transparent)}
 /* 4) 기능 탭 — 흰 판 위에서 이어짐 */
 .shell{background:var(--surface); border-bottom:1px solid var(--line); padding:0 20px}
 .shell-in{max-width:1500px; margin:0 auto; display:flex; align-items:center; gap:14px}
-.tabs{display:flex; gap:0; overflow-x:auto; flex:1}
+.tabs{display:flex; gap:0; overflow-x:auto; overflow-y:hidden; flex:1}
 .tab{border:0; background:transparent; color:var(--ink-2); padding:11px 16px;
   font-size:13.5px; font-weight:500; white-space:nowrap;
   border-bottom:2.5px solid transparent; margin-bottom:-1px}
@@ -299,7 +299,7 @@ tr.picked{background:color-mix(in srgb, var(--brand) 5%, transparent)}
 .tab[aria-selected="true"]{color:var(--brand); border-bottom-color:var(--brand); font-weight:700}
 .tab:focus-visible{outline:2px solid var(--brand); outline-offset:-2px}
 
-main{padding:20px; max-width:1500px; margin:0 auto}
+main{padding:20px; max-width:1540px; margin:0 auto}
 .panel[hidden],.view[hidden]{display:none}
 .sec-head{margin-bottom:14px}
 .sec-head h2{font-size:17px}
@@ -381,6 +381,14 @@ main{padding:20px; max-width:1500px; margin:0 auto}
 .legend-btn[aria-pressed="true"]{background:var(--k-color,var(--brand)); color:#fff; font-weight:700}
 .legend-btn[aria-pressed="true"] i{display:none}
 #sCalLegend{gap:2px; background:var(--surface-2); border:1px solid var(--line-soft); border-radius:99px; padding:3px}
+.legend-pill{gap:2px; background:var(--surface-2); border:1px solid var(--line-soft); border-radius:99px; padding:3px}
+.legend-compact .legend-btn{padding:4px 9px; font-size:10.5px}
+.legend-compact .legend-btn i{width:8px; height:8px; margin-right:4px}
+#sCalLegendTop{margin-left:auto}
+@media (min-width:601px){
+  .cal-meta{display:none}
+  .cal-top{border-bottom:1px solid var(--line-soft)}
+}
 .hint{font-size:11.5px; font-weight:600; color:var(--ink-2); padding:8px 16px; border-bottom:1px solid var(--line-soft); background:var(--strip)}
 #sHintBox,#noticePreviewBox{overflow:hidden}
 .hint-track{display:inline-block; white-space:nowrap; animation-name:hint-scroll; animation-timing-function:linear; animation-iteration-count:infinite}
@@ -799,6 +807,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   #sUpdatedAt{font-size:9px; gap:2px; padding:0 2px}
   #sUpdatedAt .opt-label{display:none}
   #t-cal .cal-top{justify-content:center}
+  #sCalLegendTop{display:none}
 
   /* 장학금 일정 전체보기 표 — 좁은 화면에서 '장학금' 열이 한두 글자씩 세로로 깨지는 문제 방지 */
   .stbl-list table{table-layout:fixed}
@@ -1087,6 +1096,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
         <h2 id="sCalTitle"></h2>
         <button class="navbtn" id="sNextM" aria-label="다음 달">›</button>
         <button class="today-btn" id="sTodayBtn">오늘</button>
+        <div class="legend legend-pill legend-compact" id="sCalLegendTop"></div>
       </div>
       <div class="cal-meta">
         <div class="legend" id="sCalLegend"></div>
@@ -2121,9 +2131,11 @@ function drawStudent(){
   drawHintMarquee();
   drawCalFilter();
   renderCalendar($('#sCalBody'),$('#sCalTitle'),sCalY,sCalM,studentEvents(),false);
-  $('#sCalLegend').innerHTML=[{id:'all',name:'전체',color:null}].concat(S_KIND).map(k=>
+  const legendHtml=[{id:'all',name:'전체',color:null}].concat(S_KIND).map(k=>
     `<button type="button" class="legend-btn" data-skind="${k.id}" aria-pressed="${k.id===sFilter}"${k.color?` style="--k-color:${k.color}"`:''}>${k.color?`<i style="background:${k.color}"></i>`:''}${esc(k.name)}</button>`
   ).join('');
+  $('#sCalLegend').innerHTML=legendHtml;
+  const sCalLegendTopEl=$('#sCalLegendTop'); if(sCalLegendTopEl) sCalLegendTopEl.innerHTML=legendHtml;
   drawUpdatedAt();
   const up=filteredStudentEvents().filter(e=>(sFilter==='all'||e.kind===sFilter) && e.end>=TODAY).sort((a,b)=>a.start.localeCompare(b.start)).slice(0,6);
   $('#sUpN').textContent=up.length;

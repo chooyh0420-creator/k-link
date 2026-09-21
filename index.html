@@ -261,6 +261,18 @@ h1,h2,h3,h4{margin:0; font-weight:700; line-height:1.35}
 .kwform{display:grid; grid-template-columns:1.1fr 1.1fr 90px auto; gap:8px; align-items:end}
 @media (max-width:820px){.kwform{grid-template-columns:1fr}}
 .kwform .field{margin:0}
+/* 자동 제외 규칙 목록의 켜기/끄기 미니 스위치 */
+.switch-mini{position:relative; flex:none; display:inline-flex; align-items:center; cursor:pointer}
+.switch-mini input{position:absolute; opacity:0; width:0; height:0}
+.switch-mini .track{position:relative; flex:none; width:30px; height:17px; border-radius:99px;
+  background:#C3CBD6; border:1px solid rgba(0,0,0,.08); transition:background .16s}
+.switch-mini .knob{position:absolute; top:1px; left:1px; width:13px; height:13px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.28); transition:transform .16s}
+.switch-mini input:checked + .track{background:#2E9E6B}
+.switch-mini input:checked + .track .knob{transform:translateX(13px)}
+.switch-mini input:focus-visible + .track{outline:2px solid var(--brand); outline-offset:2px}
+.kw.ex-off{opacity:.55}
+.kw.ex-off .as{color:var(--ink-3)}
 .filebox{border:1.5px dashed var(--line-strong); border-radius:var(--radius); padding:22px 18px;
   text-align:center; background:var(--surface-2)}
 .filebox.drag{border-color:var(--brand); background:var(--brand-soft)}
@@ -998,6 +1010,19 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
         <thead><tr><th>지급일</th><th>학생에게 보여줄 이름</th><th>원본(결의제목 등)</th><th>구분</th><th>금액</th><th style="width:44px"></th></tr></thead>
         <tbody id="prevRows"></tbody></table></div>
     </div>
+
+    <div class="step" id="exStep">
+      <div class="step-h"><span class="step-n">4</span><h3>자동 제외 규칙 설정</h3>
+        <span class="sub">결의제목에 특정 단어가 들어가면 미리보기에서 자동으로 빼는 규칙입니다. 스위치로 바로 켜고 끌 수 있고, 새 규칙도 직접 추가할 수 있습니다.</span></div>
+      <div class="kwlist" id="exList"></div>
+      <div class="kwform" style="grid-template-columns:1.2fr 1.2fr auto">
+        <div class="field"><label for="exWord">이 말이 들어가면 제외</label>
+          <input type="text" id="exWord" placeholder="예: 반환"></div>
+        <div class="field"><label for="exExcept">단, 이 말이 있으면 제외하지 않음 (선택)</label>
+          <input type="text" id="exExcept" placeholder="예: 재지급"></div>
+        <div><button class="btn btn-sm" id="exAdd">추가</button></div>
+      </div>
+    </div>
   </section>
 
   <section class="panel" id="s-hist" hidden>
@@ -1174,6 +1199,9 @@ async function cloudSetMeta(key, value){
     if(error) console.warn('클라우드 저장 실패(메타):', error.message); }
   catch(err){ console.warn('클라우드 저장 실패(메타):', err); }
 }
+function persistExcludeKeywords(){
+  cloudSetMeta('exclude_keywords', JSON.stringify(EXCLUDE_KEYWORDS));
+}
 /* 지급일 업로드로 반영된 항목을 '삭제'하면 실제로는 이 목록(hidden_event_ids)에
    id를 추가해 화면(캘린더·목록 어디서든)에서만 숨깁니다. 되돌릴 수 있게 원본
    데이터는 그대로 두는 방식이라, 실수로 지웠을 때도 안전하게 복구할 수 있습니다. */
@@ -1208,21 +1236,27 @@ async function initCloudSync(){
     }else{
       KEYWORDS.forEach(k=>cloudInsertKeyword(k));
     }
+    const metaMap={};
     if(metaRes.data && metaRes.data.length){
-      const metaMap={};
       metaRes.data.forEach(r=>{ metaMap[r.key]=r.value; });
-      if(metaMap.pay_updated_at){
-        PAY_UPDATED_AT = metaMap.pay_updated_at;
-        try{ localStorage.setItem('klink_pay_updated_at', PAY_UPDATED_AT); }catch(_){}
-      }
-      if(metaMap.hidden_event_ids){
-        try{ HIDDEN_IDS=new Set(JSON.parse(metaMap.hidden_event_ids)); }catch(_){ /* 무시 */ }
-      }
+    }
+    if(metaMap.pay_updated_at){
+      PAY_UPDATED_AT = metaMap.pay_updated_at;
+      try{ localStorage.setItem('klink_pay_updated_at', PAY_UPDATED_AT); }catch(_){}
+    }
+    if(metaMap.hidden_event_ids){
+      try{ HIDDEN_IDS=new Set(JSON.parse(metaMap.hidden_event_ids)); }catch(_){ /* 무시 */ }
+    }
+    if(metaMap.exclude_keywords){
+      try{ EXCLUDE_KEYWORDS=JSON.parse(metaMap.exclude_keywords); }catch(_){ /* 무시 */ }
+    }else{
+      persistExcludeKeywords(); // 클라우드에 아직 없으면 기본 규칙을 최초 1회 저장해둡니다.
     }
   }catch(err){
     console.warn('클라우드 동기화 실패, 이 브라우저 메모리 데이터로만 표시합니다:', err);
   }
   drawKeywords();
+  drawExcludeKeywords();
   drawImportedList();
   if(mode==='student'){ drawStudent(); } else if(mode==='staff'){ drawStaff(); }
 }
@@ -2124,6 +2158,14 @@ let KEYWORDS=[
 ];
 let kwSeq=10;
 
+/* 자동 제외 규칙 — 결의제목에 word가 들어가면 제외하되, except가 있고 그 말도
+   들어가 있으면 예외로 두고 제외하지 않습니다 (예: '반환'은 제외하되 '재지급'이
+   같이 있으면 실제 지급이므로 제외하지 않음). on=false면 규칙을 꺼둔 상태입니다. */
+let EXCLUDE_KEYWORDS=[
+  {id:'X1', word:'반환', except:'재지급', on:true}
+];
+let exSeq=2;
+
 /* 학생용 캘린더 "장학 종류를 선택해주세요" 필터.
    기본값은 항상 '전체'입니다. 키워드와 매칭되지 않는 일정(수기 추가·학생공개 등)은
    필터 대상이 아니라 항상 그대로 보여줍니다 — 실수로 안 보이게 되는 일이 없도록. */
@@ -2208,6 +2250,35 @@ function addKeyword(){
   toast(`"${w}" 장학을 목록에 추가했습니다. 다음에 파일을 넣을 때부터 적용됩니다.`);
 }
 
+function drawExcludeKeywords(){
+  const list=$('#exList');
+  if(!list) return;
+  list.innerHTML = EXCLUDE_KEYWORDS.length ? EXCLUDE_KEYWORDS.map(x=>{
+    const en = x.on!==false;
+    return `
+    <div class="kw${en?'':' ex-off'}">
+      <label class="switch-mini" title="${en?'켜짐 (자동 제외)':'꺼짐 (제외 안 함)'}">
+        <input type="checkbox" data-exon="${x.id}" ${en?'checked':''}>
+        <span class="track"><span class="knob"></span></span>
+      </label>
+      <b>"${esc(x.word)}"</b>
+      <span class="as">포함 시 자동 제외${x.except?` · "${esc(x.except)}" 포함하면 예외`:''}</span>
+      <button class="kd" data-exdel="${x.id}" title="삭제">✕</button>
+    </div>`;
+  }).join('')
+    : '<div class="kwempty">등록된 제외 규칙이 없습니다.</div>';
+}
+function addExcludeKeyword(){
+  const w=$('#exWord').value.trim();
+  if(!w){ toast('제외할 말을 입력해주세요.'); $('#exWord').focus(); return; }
+  const ex={id:'X'+(exSeq++), word:w, except:$('#exExcept').value.trim(), on:true};
+  EXCLUDE_KEYWORDS.push(ex);
+  persistExcludeKeywords();
+  $('#exWord').value=''; $('#exExcept').value='';
+  drawExcludeKeywords();
+  toast(`"${w}" 제외 규칙을 추가했습니다. 다음에 파일을 넣을 때부터 적용됩니다.`);
+}
+
 /* 전표번호 → 날짜 */
 function slipToDate(v){
   const s=String(v==null?'':v).trim();
@@ -2259,7 +2330,7 @@ function buildPreview(grid){
 
   const rows=[];
   let skippedNonPay=0;
-  let skippedRefund=0;
+  let skippedByRule=0;
   for(let i=hi+1;i<grid.length;i++){
     const row=grid[i]||[];
     const date=slipToDate(row[cSlip]);
@@ -2270,10 +2341,12 @@ function buildPreview(grid){
     /* '수입'(재단·정부에서 학교로 들어오는 돈)과 '대체'(내부 회계 정리)는
        학생에게 나가는 지급일이 아니므로 학생용 캘린더 후보에서 제외합니다. */
     if(cGubun>-1 && gubun!=='지출'){ skippedNonPay++; continue; }
-    /* 자퇴 등으로 학교가 재단·정부에 도로 돌려주는 '반환' 건은 학생에게 나가는
-       지급이 아니므로 제외합니다. 단, 반환됐던 금액을 학생에게 다시 지급하는
-       '재지급' 건은 실제 지급일이므로 그대로 둡니다. */
-    if(title.includes('반환') && !title.includes('재지급')){ skippedRefund++; continue; }
+    /* 위 1번 아래 '자동 제외 규칙 설정'에서 켜둔 규칙과 결의제목을 대조합니다.
+       (예: '반환'이 들어가면 제외하되, '재지급'이 같이 있으면 실제 지급이므로
+       예외로 두고 제외하지 않음 — 화면에서 직접 켜고 끄거나 새 규칙을 추가할 수
+       있습니다.) */
+    const hitRule = EXCLUDE_KEYWORDS.find(x=>x.on!==false && x.word && title.includes(x.word) && !(x.except && title.includes(x.except)));
+    if(hitRule){ skippedByRule++; continue; }
     rows.push({ date, title, gubun, stat:String(row[cStat]||'').trim(), amount:String(row[cAmt]||'').trim() });
   }
   if(!rows.length){ toast('전표번호가 있는 「지출」 행을 찾지 못했습니다.'); return; }
@@ -2287,7 +2360,7 @@ function buildPreview(grid){
   const added=autoImportMatched(matched);
   const skipParts=[];
   if(skippedNonPay) skipParts.push(`수입·대체 ${skippedNonPay}건`);
-  if(skippedRefund) skipParts.push(`반환 ${skippedRefund}건`);
+  if(skippedByRule) skipParts.push(`자동 제외 규칙 ${skippedByRule}건`);
   const skipNote = skipParts.length ? ` (${skipParts.join(', ')}은 지급일이 아니라서 제외)` : '';
   if(!matched.length){
     toast(`파일에서 ${rows.length}건을 읽었지만, 등록한 장학 키워드와 일치하는 결의가 없습니다. 위 1번 목록에 키워드를 등록해주세요.${skipNote}`);
@@ -2501,6 +2574,10 @@ document.addEventListener('click',e=>{
   if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId); drawKeywords();
     return; }
   if(e.target.id==='kwAdd'){addKeyword();return}
+  const exd=e.target.closest('[data-exdel]');
+  if(exd){ const delId=exd.dataset.exdel; EXCLUDE_KEYWORDS=EXCLUDE_KEYWORDS.filter(x=>x.id!==delId); persistExcludeKeywords(); drawExcludeKeywords();
+    return; }
+  if(e.target.id==='exAdd'){addExcludeKeyword();return}
   if(e.target.id==='filePick'){$('#fileInput').click();return}
   const di=e.target.closest('[data-delimp]');
   if(di){ const ev=S_EVENTS.find(x=>x.id===di.dataset.delimp); deleteImportedEvent(di.dataset.delimp);
@@ -2612,6 +2689,17 @@ document.addEventListener('change', e=>{
       drawImportedList();
       drawStudent();
       toast('구분을 변경했습니다.');
+    }
+    return;
+  }
+  const exo=e.target.closest('[data-exon]');
+  if(exo){
+    const x=EXCLUDE_KEYWORDS.find(v=>v.id===exo.dataset.exon);
+    if(x){
+      x.on=exo.checked;
+      persistExcludeKeywords();
+      drawExcludeKeywords();
+      toast(x.on?`"${x.word}" 제외 규칙을 켰습니다.`:`"${x.word}" 제외 규칙을 껐습니다.`);
     }
     return;
   }

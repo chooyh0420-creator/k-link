@@ -564,8 +564,6 @@ main{padding:20px; max-width:1500px; margin:0 auto}
 .btn{font-size:13px; font-weight:700; padding:9px 16px; border-radius:6px; white-space:nowrap;
   border:1px solid var(--brand); background:var(--brand); color:var(--brand-on)}
 .btn.ghost{background:transparent; color:var(--brand)}
-.btn.ghost.danger{border-color:var(--s-late); color:var(--s-late)}
-.btn.ghost.danger:hover{background:var(--s-late-bg)}
 .btn:disabled{opacity:.45; cursor:not-allowed}
 .btn-sm{font-size:12px; padding:6px 11px}
 .grid2{display:grid; grid-template-columns:1.25fr 1fr; gap:16px; align-items:start}
@@ -724,26 +722,6 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
    모바일 반응형 — 상단 학교 헤더 + 이용 대상(학생용/직원용) 탭
    * 파일 맨 끝에 위치시켜 기존 규칙(.visit-pill 등)보다 항상 우선 적용되게 함
    ================================================================ */
-
-/* ===== 페이지 하단 공유/문의 푸터 ===== */
-.page-foot{max-width:960px; margin:36px auto 22px; padding:0 16px; text-align:center}
-.page-foot .foot-actions{display:flex; flex-wrap:wrap; gap:10px; justify-content:center}
-.page-foot .foot-btn{font-size:12.5px; font-weight:700; color:var(--brand); background:var(--surface);
-  border:1px solid var(--line); border-radius:100px; padding:9px 16px; cursor:pointer; white-space:nowrap;
-  display:inline-flex; align-items:center; gap:6px; transition:all .15s; box-shadow:var(--shadow); font-family:inherit}
-.page-foot .foot-btn:hover{border-color:var(--brand); background:var(--brand-soft); transform:translateY(-1px)}
-.page-foot .foot-btn.copied{border-color:var(--s-ok); color:var(--s-ok); background:var(--s-ok-bg)}
-.foot-updated{margin-top:14px; display:flex; align-items:center; justify-content:center; gap:6px;
-  font-size:11.5px; color:var(--ink-3); white-space:nowrap}
-.foot-updated .dot{flex:none; width:6px; height:6px; border-radius:50%; background:var(--brand)}
-.foot-updated b{color:var(--ink-2); font-weight:700}
-.foot-tel{margin:6px 0 0; font-size:11.5px; color:var(--ink-3)}
-.foot-tel a{color:var(--ink-2); font-weight:700; text-decoration:none}
-.foot-tel a:hover{text-decoration:underline}
-.foot-disclaimer{margin:16px 0 0; font-size:11.5px; line-height:1.65; color:var(--ink-3)}
-.foot-copyright{margin:10px 0 0; font-size:11px; color:var(--ink-3); opacity:.85}
-.foot-copyright .foot-meta{display:block; margin-top:2px; font-size:10.5px}
-
 @media (max-width:600px){
   .gnb{padding:0 12px}
   .gnb-in{height:auto; min-height:52px; padding:9px 0; flex-wrap:wrap; gap:6px; row-gap:6px}
@@ -775,9 +753,6 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   .stbl-list th:nth-child(2), .stbl-list td:nth-child(2){width:45%}
   .stbl-list th:nth-child(3), .stbl-list td:nth-child(3){width:27%}
   .stbl-list td.num{white-space:normal}
-
-  .page-foot{margin:26px auto 18px}
-  .page-foot .foot-btn{font-size:12px; padding:8px 13px}
 }
 </style>
 </head>
@@ -1043,21 +1018,6 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
       <thead><tr><th>구분</th><th>장학금</th><th>기간 / 일자</th></tr></thead>
       <tbody id="sRows"></tbody></table></div>
   </section>
-
-  <div class="page-foot">
-    <div class="foot-actions">
-      <button class="foot-btn" id="pageShareBtn" type="button">🔗 이 페이지 공유하기</button>
-      <button class="foot-btn" id="pageFeedbackBtn" type="button">✉️ 정보가 틀렸나요? 알려주세요</button>
-    </div>
-    <div class="foot-updated" id="sUpdatedAtFoot"></div>
-    <p class="foot-tel">전화 문의: <a href="tel:0535806097">053-580-6097</a> (장학안내)</p>
-    <p class="foot-disclaimer">
-      본 장학금 지급일 캘린더는 참고용 안내이며 실제 지급일은 학생계좌 오류, 지급은행 오류 등으로 인해 달라질 수 있습니다.
-    </p>
-    <p class="foot-copyright">계명대학교 장학복지팀
-      <span class="foot-meta">제작: 장학복지팀 추윤호</span>
-    </p>
-  </div>
 </div>
 </main>
 
@@ -1077,9 +1037,104 @@ const DEPTS=[
  {id:'IH',name:'입학팀',color:'#96600E'},
  {id:'JS',name:'전산개발팀',color:'#566072'}
 ];
-const FLOWS=[];
-let TASKS=[];
-let HISTORY=[];
+const FLOWS=[
+ {id:'F1',name:'2027학년도 1학기 장학·등록 연계',note:'성적 확정부터 장학금 지급 결과 확인까지'},
+ {id:'F2',name:'2026년 12월분 근로·고정장학 지급',note:'출근부 확인부터 재무팀 지급 처리까지'},
+ {id:'F3',name:'2026-2학기 학사·수납원장 및 우선감면 장학사정',note:'영구성적 확정부터 3차 추가등록까지 — 실제 업무일정(안) 기준'}
+];
+let TASKS=[
+ {id:'T1',flow:'F1',name:'2027-1학기 성적 확정',dept:'GM',owner:'교무학사팀 담당',date:'2027-01-11',baseDate:'2027-01-08',status:'일정변경',prev:[],
+  files:['확정 성적 산출자료','학적 변동 반영 결과'],
+  criteria:[['이의신청 처리 완료',true],['성적 최종 확정',true],['장학복지팀 자료 전달',false]],
+  note:'이의신청 기간이 연장되어 확정일이 3일 늦춰졌습니다. 담당자 확인 필요.'},
+ {id:'T2',flow:'F1',name:'교내장학생 선발',dept:'JH',owner:'추윤호',date:'2027-01-15',baseDate:'2027-01-15',status:'진행중',prev:[{id:'T1',lead:4}],
+  files:['선발 대상자 명단','제한사항 확인표'],
+  criteria:[['선발 대상자 검토 완료',true],['중복·제한사항 확인 완료',false],['최종 대상자 확정',false],['재무팀 전달자료 생성',false],['전달 일시 기록',false]],note:''},
+ {id:'T3',flow:'F1',name:'등록금 고지자료 장학금 반영',dept:'JM',owner:'손지영',date:'2027-01-20',baseDate:'2027-01-20',status:'예정',prev:[{id:'T2',lead:5}],
+  files:['장학 대상자 자료(장학복지팀 수신)','반영 결과 회신자료'],
+  criteria:[['장학 대상자 자료 수신',false],['학번·금액 검증',false],['고지자료 반영',false],['오류 대상 확인',false],['장학복지팀에 반영 결과 전달',false]],note:''},
+ {id:'T4',flow:'F1',name:'등록금 고지서 생성',dept:'JM',owner:'손지영',date:'2027-01-22',baseDate:'2027-01-22',status:'예정',prev:[{id:'T3',lead:2}],
+  files:['고지서 생성 결과'],criteria:[['고지 대상 확정',false],['고지서 생성',false],['발송 처리',false]],note:''},
+ {id:'T5',flow:'F1',name:'등록금 수납 결과 확인',dept:'JM',owner:'손지영',date:'2027-02-05',baseDate:'2027-02-05',status:'예정',prev:[{id:'T4',lead:14}],
+  files:['수납 현황 집계표'],criteria:[['수납 마감',false],['미납 대상 정리',false],['장학복지팀 공유',false]],note:''},
+ {id:'T6',flow:'F1',name:'장학금 지급',dept:'JH',owner:'김유정',date:'2027-02-10',baseDate:'2027-02-10',status:'예정',prev:[{id:'T5',lead:5}],
+  files:['지급 대상자 확정본','지급 처리 결과'],
+  criteria:[['지급 대상자 확정',false],['계좌·지급정보 확인',false],['지급자료 검증',false],['지급 처리',false],['지급 결과 확인',false]],note:''},
+ {id:'T7',flow:'F1',name:'지급 결과 오류 대상 확인',dept:'JH',owner:'추윤호',date:'2027-02-12',baseDate:'2027-02-12',status:'예정',prev:[{id:'T6',lead:2}],
+  files:['오류 대상 목록','재처리 결과'],criteria:[['오류 대상 추출',false],['원인 확인',false],['재처리 요청',false],['결과 회신',false]],note:''},
+ {id:'T8',flow:'F2',name:'국가근로 출근부 확인',dept:'JH',owner:'김유정',date:'2026-12-05',baseDate:'2026-12-05',status:'지연',prev:[],
+  files:['기관별 출근부','근로시간 집계표'],
+  criteria:[['기관 제출 마감',true],['미제출 기관 독촉',true],['근로시간 집계',false]],
+  note:'3개 기관 출근부가 아직 접수되지 않아 집계가 늦어지고 있습니다.'},
+ {id:'T9',flow:'F2',name:'12월분 국가근로 지급자료 작성',dept:'JH',owner:'김유정',date:'2026-12-10',baseDate:'2026-12-10',status:'확인요청',prev:[{id:'T8',lead:3}],
+  files:['지급자료(재무팀 전달용)'],
+  criteria:[['근로시간 확정',false],['지급액 산출',false],['계좌정보 검증',false],['재무팀 전달',false]],
+  note:'선행 업무 지연으로 일정 재확인이 필요합니다.'},
+ {id:'T10',flow:'F2',name:'교내근로장학금 지급 요청',dept:'JH',owner:'김유정',date:'2026-12-10',baseDate:'2026-12-10',status:'예정',prev:[{id:'T8',lead:3}],
+  files:['교내근로 지급 요청서'],criteria:[['부서별 근로확인서 수합',false],['지급액 산출',false],['재무팀 요청',false]],note:''},
+ {id:'T11',flow:'F2',name:'고정장학 지급 대상자 검토',dept:'JH',owner:'추윤호',date:'2026-12-08',baseDate:'2026-12-08',status:'완료',prev:[],
+  files:['고정장학 대상자 명단'],criteria:[['대상자 추출',true],['자격 요건 확인',true],['명단 확정',true]],note:''},
+ {id:'T12',flow:'F2',name:'재무팀 지급 처리',dept:'JM',owner:'손지영',date:'2026-12-15',baseDate:'2026-12-15',status:'예정',prev:[{id:'T9',lead:4},{id:'T10',lead:4},{id:'T11',lead:5}],
+  files:['지급 처리 결과','오류 대상 회신'],criteria:[['지급자료 수신',false],['계좌 검증',false],['이체 처리',false],['결과 회신',false]],note:''},
+ {id:'T13',flow:'F1',name:'국가장학금 1차 신청 기간',dept:'JH',owner:'추윤호',date:'2026-11-20',end:'2026-12-27',baseDate:'2026-11-20',status:'진행중',prev:[],
+  files:['신청 현황 집계'],criteria:[['신청 접수 시작',true],['중간 접수율 확인',false],['마감 안내 재공지',false]],
+  note:'여러 날에 걸친 업무 예시입니다. 달력에서 막대가 이어져 표시됩니다.'},
+
+ /* ── F3: 2026-2학기 학사·수납원장 및 우선감면 장학사정 (실제 업무일정 문서 기준) ── */
+ {id:'D1',flow:'F3',name:'2026-1학기 영구성적 확정',dept:'GM',owner:'교무학사팀 담당',date:'2026-07-08',baseDate:'2026-07-08',status:'예정',prev:[],
+  files:['영구성적 확정자료'],criteria:[['이의신청 처리 완료',false],['성적 최종 확정',false]],note:'의예과 동일 일정'},
+ {id:'D2',flow:'F3',name:'하계 계절학기 영구성적 확정',dept:'GM',owner:'교무학사팀 담당',date:'2026-07-21',baseDate:'2026-07-21',status:'예정',prev:[],
+  files:['계절학기 성적 확정자료'],criteria:[['성적 최종 확정(15시 이후)',false]],note:''},
+ {id:'D3',flow:'F3',name:'고정장학 선발의뢰 공문 발송(KAC·EMU·특기예능 등)',dept:'JH',owner:'추윤호',date:'2026-07-07',baseDate:'2026-07-07',status:'진행중',prev:[],
+  files:['선발의뢰 공문'],criteria:[['대상 장학 목록 확정',true],['공문 발송',false]],note:'7.8.(수) 이전 발송 필요'},
+ {id:'D4',flow:'F3',name:'고정(계속)장학 입력',dept:'JH',owner:'김유정',date:'2026-07-13',baseDate:'2026-07-13',status:'예정',prev:[{id:'D1',lead:2},{id:'D3',lead:3}],
+  files:['고정장학 대상자 입력자료'],criteria:[['영구성적 반영 확인',false],['고정장학 대상자 입력',false],['최종 검토',false]],note:'국가·교내·보훈 포함, 최대한 빨리 입력'},
+ {id:'D5',flow:'F3',name:'단과대학 교내장학 선발의뢰 공문 발송',dept:'JH',owner:'추윤호',date:'2026-07-10',baseDate:'2026-07-10',status:'예정',prev:[{id:'D1',lead:1}],
+  files:['선발의뢰 공문'],criteria:[['공문 발송',false]],note:'7.10.(금) 이전 발송'},
+ {id:'D6',flow:'F3',name:'단과대학 교내장학(성적·면학) 선발기간',dept:'JH',owner:'김유정',date:'2026-07-13',end:'2026-07-20',baseDate:'2026-07-13',status:'예정',prev:[{id:'D5',lead:2}],
+  files:['단과대학 선발 결과'],criteria:[['전과생 반영 확인',false],['단과대별 선발 완료',false]],note:'전과한 학생 반영 확인 필요'},
+ {id:'D7',flow:'F3',name:'1~2차 복학신청 기간',dept:'GM',owner:'교무학사팀 담당',date:'2026-07-01',end:'2026-07-23',baseDate:'2026-07-01',status:'예정',prev:[],
+  files:['복학신청 명단'],criteria:[['신청 접수 완료',false]],note:'정규등록 대상'},
+ {id:'D8',flow:'F3',name:'재입학 합격 발표',dept:'IH',owner:'입학팀 담당',date:'2026-07-23',baseDate:'2026-07-23',status:'예정',prev:[],
+  files:['재입학 합격자 명단'],criteria:[['합격자 확정',false],['발표 공지',false]],note:''},
+ {id:'D9',flow:'F3',name:'추가 교내(고정장학) 사정',dept:'JH',owner:'김유정',date:'2026-07-24',baseDate:'2026-07-24',status:'예정',prev:[{id:'D7',lead:1}],
+  files:['추가 사정 결과'],criteria:[['1~2차 복학생 반영',false],['추가 대상자 사정',false]],note:'복학신청 종료 후 진행'},
+ {id:'D10',flow:'F3',name:'교내장학금 우선감면 입력 및 최종점검',dept:'JH',owner:'추윤호',date:'2026-08-04',baseDate:'2026-08-04',status:'예정',prev:[{id:'D4',lead:3},{id:'D6',lead:3},{id:'D9',lead:2}],
+  files:['우선감면 입력 최종본'],criteria:[['고정장학 반영',false],['단과대 선발 반영',false],['추가사정 반영',false],['최종 점검',false]],note:''},
+ {id:'D11',flow:'F3',name:'재학생 학사원장 업로드',dept:'GM',owner:'교무학사팀 담당',date:'2026-08-03',baseDate:'2026-08-03',status:'예정',prev:[{id:'D1',lead:2},{id:'D7',lead:2}],
+  files:['재학생 학사원장'],criteria:[['1학기 성적 이관',false],['1~2차 복학생 포함',false],['졸업사정 변경자 재업로드',false]],
+  note:'교무팀 졸업사정 후 학적상태코드·총이수학점·총평균평점 변경자 재업로드 필요'},
+ {id:'D12',flow:'F3',name:'재입학 학사·수납원장 업로드',dept:'GM',owner:'교무학사팀 담당',date:'2026-08-03',baseDate:'2026-08-03',status:'예정',prev:[{id:'D8',lead:0}],
+  files:['재입학 학사원장','재입학 수납원장'],criteria:[['학사원장 업로드(8.3)',false],['수납원장 업로드(8.20)',false]],note:'학사원장 8.3 / 수납원장 8.20 순차 진행'},
+ {id:'D13',flow:'F3',name:'등록자료 생성',dept:'JM',owner:'손지영',date:'2026-08-05',baseDate:'2026-08-05',status:'예정',prev:[{id:'D10',lead:1},{id:'D11',lead:2}],
+  files:['등록자료'],criteria:[['우선감면 반영 확인',false],['등록자료 생성 완료',false]],note:'8.5.(수) 오전'},
+ {id:'D14',flow:'F3',name:'장학입력 전산검증',dept:'JS',owner:'전산 담당',date:'2026-08-05',baseDate:'2026-08-05',status:'예정',prev:[{id:'D10',lead:1}],
+  files:['전산검증 결과'],criteria:[['입력값 전산 검증',false],['오류 대상 확인',false]],note:'8.5.(수) 오전, 등록자료 생성과 병행'},
+ {id:'D15',flow:'F3',name:'국가장학금 우선감면 장학사정',dept:'JH',owner:'추윤호',date:'2026-08-05',end:'2026-08-11',baseDate:'2026-08-05',status:'예정',prev:[{id:'D13',lead:0},{id:'D14',lead:0}],
+  files:['국가장학 우선감면 사정결과'],criteria:[['의대생 포함 사정',false],['계명복지 확인',false],['사정 완료',false]],
+  note:'8.5.(수) 오후 ~ 8.11.(화) 오전'},
+ {id:'D16',flow:'F3',name:'국가장학 우선감면 후 체육특기자 수정입력',dept:'JH',owner:'김유정',date:'2026-08-11',baseDate:'2026-08-11',status:'예정',prev:[{id:'D15',lead:0}],
+  files:['체육특기자 수정입력 결과'],criteria:[['수정 대상 확인',false],['재입력 완료',false]],note:'8.11.(화) 오후'},
+ {id:'D17',flow:'F3',name:'등록금고지서 오픈 전 최종점검(전산·재무·장학복지 합동)',dept:'JS',owner:'전산 담당',date:'2026-08-12',baseDate:'2026-08-12',status:'예정',prev:[{id:'D16',lead:1}],
+  files:['최종점검 결과'],criteria:[['3개 부서 합동 점검',false],['오류 대상 조치',false]],note:'8.12.(수) 09:30~16:30'},
+ {id:'D18',flow:'F3',name:'등록금 고지서 출력',dept:'JM',owner:'손지영',date:'2026-08-13',baseDate:'2026-08-13',status:'예정',prev:[{id:'D17',lead:1}],
+  files:['고지서 출력 결과'],criteria:[['고지 대상 확정',false],['고지서 출력(09:00)',false]],note:''},
+ {id:'D19',flow:'F3',name:'1차 정규등록 기간',dept:'JM',owner:'손지영',date:'2026-08-24',end:'2026-08-27',baseDate:'2026-08-24',status:'예정',prev:[{id:'D18',lead:11}],
+  files:['1차 등록 현황'],criteria:[['졸업유예생 등록 확인',false],['수납원장 반영(8.21)',false]],note:'학사원장 8.3 / 수납원장 8.21'},
+ {id:'D20',flow:'F3',name:'2차(추가)등록 기간',dept:'JM',owner:'손지영',date:'2026-09-01',end:'2026-09-04',baseDate:'2026-09-01',status:'예정',prev:[{id:'D19',lead:5}],
+  files:['2차 등록 현황'],criteria:[['수납원장 반영(8.31)',false]],note:'3차 복학생 포함'},
+ {id:'D21',flow:'F3',name:'3차(추가)등록 기간',dept:'JM',owner:'손지영',date:'2026-09-09',end:'2026-09-11',baseDate:'2026-09-09',status:'예정',prev:[{id:'D20',lead:5}],
+  files:['3차 등록 현황'],criteria:[['수납원장 반영(9.8)',false]],note:''},
+ {id:'D22',flow:'F3',name:'학점등록 신청 기간',dept:'JH',owner:'김유정',date:'2026-08-03',end:'2026-09-03',baseDate:'2026-08-03',status:'예정',prev:[],
+  files:['학점등록 신청 현황'],criteria:[['신청 접수 완료',false]],note:''},
+ {id:'D23',flow:'F3',name:'학점등록 자료생성',dept:'JM',owner:'손지영',date:'2026-09-04',baseDate:'2026-09-04',status:'예정',prev:[{id:'D22',lead:1},{id:'D21',lead:0}],
+  files:['학점등록 자료'],criteria:[['자료생성 완료',false]],note:'3차 추가등록기간 납부로 연결'}
+];
+let HISTORY=[
+ {at:'2026-12-05 14:22',who:'교무학사팀 담당',task:'T1',what:'예정일 2027-01-08 → 2027-01-11',why:'성적 이의신청 기간 연장',affect:'교내장학생 선발 외 5건'},
+ {at:'2026-12-05 09:10',who:'김유정',task:'T8',what:'상태 진행중 → 지연',why:'3개 기관 출근부 미접수',affect:'12월분 국가근로 지급자료 작성 외 2건'},
+ {at:'2026-12-03 16:40',who:'추윤호',task:'T11',what:'상태 진행중 → 완료',why:'대상자 명단 확정',affect:'-'}
+];
 const S_KIND=[
  {id:'apply',name:'신청',color:'#14386E'},{id:'pay',name:'지급',color:'#116454'},
  {id:'due',name:'납부·마감',color:'#B22A24'}
@@ -1094,57 +1149,12 @@ function markPayUpdated(){
   drawUpdatedAt();
 }
 function drawUpdatedAt(){
-  const els=[$('#sUpdatedAt'), $('#sUpdatedAtFoot')].filter(Boolean);
-  if(!els.length) return;
-  let html;
-  if(!PAY_UPDATED_AT){ html='<span class="dot" style="background:var(--ink-3)"></span>자료 업데이트 전'; }
-  else{
-    const d=new Date(PAY_UPDATED_AT);
-    const txt=isNaN(d) ? '' : d.toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-    html=`<span class="dot"></span>자료 업데이트 <b>${esc(txt)}</b>`;
-  }
-  els.forEach(el=>{ el.innerHTML=html; });
+  const el=$('#sUpdatedAt'); if(!el) return;
+  if(!PAY_UPDATED_AT){ el.innerHTML='<span class="dot" style="background:var(--ink-3)"></span>자료 업데이트 전'; return; }
+  const d=new Date(PAY_UPDATED_AT);
+  const txt=isNaN(d) ? '' : d.toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  el.innerHTML=`<span class="dot"></span>자료 업데이트 <b>${esc(txt)}</b>`;
 }
-
-/* ===== 페이지 하단 공유 & 문의 버튼 ===== */
-(function initPageFoot(){
-  const shareBtn=$('#pageShareBtn');
-  if(shareBtn){
-    const shareData={ title:'계명대학교 K-Link 장학금 캘린더', text:'내 장학금 언제 들어오는지 K-Link에서 확인해보세요!', url:location.href };
-    shareBtn.addEventListener('click', async ()=>{
-      try{
-        if(navigator.share){ await navigator.share(shareData); return; }
-        throw new Error('no share');
-      }catch(e){
-        try{
-          await navigator.clipboard.writeText(location.href);
-          const orig=shareBtn.textContent;
-          shareBtn.textContent='✅ 링크가 복사됐어요!';
-          shareBtn.classList.add('copied');
-          setTimeout(()=>{ shareBtn.textContent=orig; shareBtn.classList.remove('copied'); }, 2000);
-        }catch(err){
-          prompt('아래 주소를 복사해 공유하세요:', location.href);
-        }
-      }
-    });
-  }
-  const fbBtn=$('#pageFeedbackBtn');
-  if(fbBtn){
-    const email='choo@kmu.ac.kr';
-    const subject=encodeURIComponent('[K-Link] 정보 수정·문의');
-    const body=encodeURIComponent('어떤 장학금의 어떤 내용인지 알려주시면 확인하겠습니다.\n\n- 장학금명: \n- 내용: ');
-    const mailto=`mailto:${email}?subject=${subject}&body=${body}`;
-    fbBtn.addEventListener('click', async ()=>{
-      let copied=false;
-      try{ await navigator.clipboard.writeText(email); copied=true; }catch(e){}
-      try{ window.location.href=mailto; }catch(e){}
-      const orig=fbBtn.textContent;
-      fbBtn.textContent = copied ? ('✅ 메일 주소 복사됨 (' + email + ')') : ('✉️ ' + email + ' 로 보내주세요');
-      fbBtn.classList.add('copied');
-      setTimeout(()=>{ fbBtn.textContent=orig; fbBtn.classList.remove('copied'); }, 3000);
-    });
-  }
-})();
 
 /* ===== 클라우드 동기화(Supabase) =====
    K-Link는 지금까지 브라우저 메모리에만 데이터를 담고 있어서, 새로고침하거나
@@ -1695,7 +1705,6 @@ function saveQuick(){
   const deptV=$('#qpDept').value;
   DRAFT=null;                       // 임시 블록을 실제 업무로 확정
   $('#quickpop').hidden=true;
-  if(!FLOWS.length){ FLOWS.push({id:'FN'+(flowSeq++), name:'새 업무 흐름', note:'', order:[]}); }
   const t=addTask({name, dept:deptV, owner:'미지정', date:start, end, flow:FLOWS[0].id,
     prev:null, files:[], criteria:[]});
   const f=FLOWS.find(x=>x.id===t.flow);
@@ -1720,7 +1729,6 @@ function addTask({name,dept,owner,date,end,flow,prev,files,criteria}){
 
 /* "옵션 더보기" — 빠른 추가에 입력한 값을 이어받아 상세 항목(선행 업무·완료 기준 등)까지 입력하는 서랍 */
 function openNewFull(opts){
-  if(!FLOWS.length){ FLOWS.push({id:'FN'+(flowSeq++), name:'새 업무 흐름', note:'', order:[]}); }
   const o=opts||{};
   const hasPop = !!$('#qpTitle');
   const name = o.name!=null ? o.name : (hasPop ? $('#qpTitle').value.trim() : '');
@@ -1807,7 +1815,14 @@ function saveNewFull(){
 }
 
 /* ===== 부서 메모 ===== */
-let MEMOS=[];
+let MEMOS=[
+ {id:'M1',dept:'JM',at:'2026-07-06 10:12',
+  text:'등록자료 생성(8.5) 전에 장학 입력이 다 끝나야 합니다. 작년에 여기서 한 번 밀렸어요.',
+  replies:[{id:'R1',dept:'JH',at:'2026-07-06 11:05',text:'네, 8.4까지 우선감면 입력 마치겠습니다.'}]},
+ {id:'M2',dept:'JH',at:'2026-07-06 09:40',
+  text:'단과대 선발 의뢰 공문은 7.10 이전 발송. 전과한 학생 반영됐는지 꼭 확인할 것.',
+  replies:[]}
+];
 let memoFilter='JH', memoSeq=10, replySeq=10, openReply=null;
 
 function drawMemos(){
@@ -2069,10 +2084,7 @@ function openTask(id){
     </div>
     <div class="dr-sec"><h4>상태 변경</h4>
       <div class="field"><select id="stSel">${STATUS.map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('')}</select></div>
-      <button class="btn btn-sm" id="stSave" data-task="${t.id}">상태 저장</button></div>
-    <div class="dr-sec"><h4>업무 삭제</h4>
-      <p style="color:var(--ink-3);font-size:12px;margin:0 0 10px">삭제하면 이 업무와 연결된 선행·후속 관계도 함께 정리됩니다.</p>
-      <button class="btn ghost danger btn-sm" data-deltask="${t.id}">이 업무 삭제</button></div>`;
+      <button class="btn btn-sm" id="stSave" data-task="${t.id}">상태 저장</button></div>`;
   $('#drawer').hidden=false;$('#scrim').hidden=false;$('#drawer').dataset.task=id;$('#drClose').focus();
 }
 function openEvent(id){
@@ -2491,7 +2503,6 @@ document.addEventListener('click',e=>{
   /* 연결 지도 편집 */
   const ac=e.target.closest('[data-addcard]'); if(ac){addCardToFlow(ac.dataset.addcard);return}
   const dc2=e.target.closest('[data-delcard]'); if(dc2){deleteCard(dc2.dataset.delcard);return}
-  const dt2=e.target.closest('[data-deltask]'); if(dt2){deleteCard(dt2.dataset.deltask);closeDrawer();return}
   const df=e.target.closest('[data-delflow]'); if(df){deleteFlow(df.dataset.delflow);return}
   const oc=e.target.closest('[data-opencard]'); if(oc){openTask(oc.dataset.opencard);return}
   if(e.target.id==='addFlowBtn'){addFlow();return}

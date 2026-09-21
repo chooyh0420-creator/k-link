@@ -2425,6 +2425,10 @@ function buildPreview(grid){
   }).filter(Boolean);
 
   const added=autoImportMatched(matched);
+  /* 새로 추가된 항목이 없어도(이미 모두 반영돼 있어도), 방금 파일을 확인한 시점을
+     '자료 업데이트' 시각으로 기록합니다. 새 항목이 있을 때만 갱신되던 예전 로직을
+     "업로드 성공 시 항상 갱신"으로 바꾼 부분입니다. */
+  markPayUpdated();
   const skipParts=[];
   if(skippedNonPay) skipParts.push(`수입·대체 ${skippedNonPay}건`);
   if(skippedByRule) skipParts.push(`자동 제외 규칙 ${skippedByRule}건`);
@@ -2466,7 +2470,6 @@ function autoImportMatched(matched){
       desc:'', where:'장학복지팀', url:'', source:'import', srcTitle:r.title, amount:r.amount}));
     S_EVENTS.push(...newEvents);
     cloudInsertEvents(newEvents);
-    markPayUpdated();
     drawStudent();
   }
   drawImportedList();

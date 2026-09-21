@@ -2259,6 +2259,7 @@ function buildPreview(grid){
 
   const rows=[];
   let skippedNonPay=0;
+  let skippedRefund=0;
   for(let i=hi+1;i<grid.length;i++){
     const row=grid[i]||[];
     const date=slipToDate(row[cSlip]);
@@ -2269,6 +2270,10 @@ function buildPreview(grid){
     /* '수입'(재단·정부에서 학교로 들어오는 돈)과 '대체'(내부 회계 정리)는
        학생에게 나가는 지급일이 아니므로 학생용 캘린더 후보에서 제외합니다. */
     if(cGubun>-1 && gubun!=='지출'){ skippedNonPay++; continue; }
+    /* 자퇴 등으로 학교가 재단·정부에 도로 돌려주는 '반환' 건은 학생에게 나가는
+       지급이 아니므로 제외합니다. 단, 반환됐던 금액을 학생에게 다시 지급하는
+       '재지급' 건은 실제 지급일이므로 그대로 둡니다. */
+    if(title.includes('반환') && !title.includes('재지급')){ skippedRefund++; continue; }
     rows.push({ date, title, gubun, stat:String(row[cStat]||'').trim(), amount:String(row[cAmt]||'').trim() });
   }
   if(!rows.length){ toast('전표번호가 있는 「지출」 행을 찾지 못했습니다.'); return; }
@@ -2280,7 +2285,10 @@ function buildPreview(grid){
   }).filter(Boolean);
 
   const added=autoImportMatched(matched);
-  const skipNote = skippedNonPay ? ` (수입·대체 ${skippedNonPay}건은 지급일이 아니라서 제외)` : '';
+  const skipParts=[];
+  if(skippedNonPay) skipParts.push(`수입·대체 ${skippedNonPay}건`);
+  if(skippedRefund) skipParts.push(`반환 ${skippedRefund}건`);
+  const skipNote = skipParts.length ? ` (${skipParts.join(', ')}은 지급일이 아니라서 제외)` : '';
   if(!matched.length){
     toast(`파일에서 ${rows.length}건을 읽었지만, 등록한 장학 키워드와 일치하는 결의가 없습니다. 위 1번 목록에 키워드를 등록해주세요.${skipNote}`);
   }else if(!added.length){

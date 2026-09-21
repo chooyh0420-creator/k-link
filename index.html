@@ -370,6 +370,7 @@ main{padding:20px; max-width:1500px; margin:0 auto}
 .legend{margin-left:auto; display:flex; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-2)}
 .cal-meta{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:0 16px 14px; border-bottom:1px solid var(--line-soft)}
 .updated-at{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--ink-3); white-space:nowrap}
+#sUpdatedAt{margin-left:auto; padding:0 2px}
 .updated-at .dot{flex:none; width:6px; height:6px; border-radius:50%; background:var(--brand)}
 .updated-at b{color:var(--ink-2); font-weight:700}
 .legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px}
@@ -1061,7 +1062,6 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
         <button class="today-btn" id="sTodayBtn">오늘</button>
       </div>
       <div class="cal-meta">
-        <div class="updated-at" id="sUpdatedAt" title="장학금 지급일 자료를 학생용 캘린더에 마지막으로 올린 시점입니다."></div>
         <div class="legend" id="sCalLegend"></div>
       </div>
       <div class="cal-filter-row" id="calFilterRow">
@@ -2557,7 +2557,12 @@ const TABS={
 function tabsHtml(m, activeId){
   const t=TABS[m];
   const btn=([id,label])=>`<button class="tab" role="tab" data-p="${id}" aria-selected="${id===activeId}">${label}</button>`;
-  if(m!=='staff') return t.map(btn).join('');
+  if(m!=='staff'){
+    const updatedAt = m==='student'
+      ? `<div class="updated-at" id="sUpdatedAt" title="장학금 지급일 자료를 학생용 캘린더에 마지막으로 올린 시점입니다."></div>`
+      : '';
+    return t.map(btn).join('') + updatedAt;
+  }
   /* 앞의 두 탭은 같은 업무 데이터를 씁니다. 구분선으로만 묶어 가볍게 표시합니다.
      마지막 '지급일 업로드'는 학생용 캘린더를 다루는 별도 기능이라 오른쪽 끝으로 뺍니다. */
   const last=t[t.length-1];

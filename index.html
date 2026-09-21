@@ -160,6 +160,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none !important}
 html,body{margin:0;padding:0}
+html{-webkit-text-size-adjust:100%; text-size-adjust:100%}
 body{background:var(--bg); color:var(--ink);
   font-family:'Noto Sans KR',Pretendard,-apple-system,'Malgun Gothic',sans-serif;
   font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased}
@@ -719,18 +720,18 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
    ================================================================ */
 @media (max-width:600px){
   .gnb{padding:0 12px}
-  .gnb-in{height:auto; min-height:52px; padding:9px 0; flex-wrap:wrap; gap:8px; row-gap:8px}
+  .gnb-in{height:auto; min-height:52px; padding:9px 0; flex-wrap:wrap; gap:6px; row-gap:6px}
   .logo{width:100%; flex-wrap:wrap; gap:8px; row-gap:6px}
   .uni-badge{height:30px; padding:4px 9px 4px 5px; gap:6px}
   .uni-badge .uni-badge-text b{font-size:10.5px}
   .uni-badge-text small{font-size:6.5px}
   .logo .bar{display:none}
   #titleBlock{flex:0 0 100%; width:100%; display:block}
-  .logo .stu-title{display:block; font-size:14px; line-height:1.35; white-space:normal}
+  .logo .stu-title{display:block; font-size:14px; line-height:1.3; white-space:normal}
   .logo b{font-size:15px}
   .logo .sub{display:inline-block; font-size:10px; margin-left:6px}
-  .gnb-in .right{width:100%; justify-content:flex-end; margin-left:0}
-  .visit-pill{padding:4px 11px; gap:7px}
+  .gnb-in .right{width:100%; justify-content:flex-end; margin-left:0; margin-top:-4px}
+  .visit-pill{padding:3px 11px; gap:7px}
   .visit-pill .vp-item i{font-size:8.5px}
   .visit-pill .vp-item b{font-size:11.5px}
   .who{font-size:10.5px}

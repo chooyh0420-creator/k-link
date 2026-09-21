@@ -250,6 +250,7 @@ h1,h2,h3,h4{margin:0; font-weight:700; line-height:1.35}
 .kw .as{color:var(--ink-2); font-size:12px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .kw .kind-tag{flex:none; font-size:10.5px; font-weight:700; color:var(--brand); background:var(--brand-soft);
   border-radius:99px; padding:2px 9px}
+.imp-kind-sel{font-family:inherit; font-size:11.5px; padding:4px 6px; border:1px solid var(--line-strong); border-radius:6px; background:var(--surface); color:var(--ink)}
 .kw .kd{flex:none; border:0; background:transparent; color:var(--ink-3); font-size:13px; padding:3px 7px;
   border-radius:6px; cursor:pointer; line-height:1}
 .kw .kd:hover{background:var(--s-late-bg); color:var(--s-late)}
@@ -1148,6 +1149,13 @@ async function cloudInsertEvents(events){
     if(error) console.warn('클라우드 저장 실패(일정):', error.message); }
   catch(err){ console.warn('클라우드 저장 실패(일정):', err); }
 }
+/* 자동 매칭으로 잘못 분류된 구분(신청/지급/납부·마감)을 화면에서 바로 고칠 때 씁니다. */
+async function cloudUpdateEventKind(id, knd){
+  if(!sb) return;
+  try{ const {error}=await sb.from('klink_student_events').update({kind:knd}).eq('id', id);
+    if(error) console.warn('클라우드 저장 실패(구분 변경):', error.message); }
+  catch(err){ console.warn('클라우드 저장 실패(구분 변경):', err); }
+}
 async function cloudInsertKeyword(k){
   if(!sb) return;
   try{ const {error}=await sb.from('klink_pay_keywords').insert({id:k.id, word:k.word, label:k.label||'', kind:k.kind||'pay'});
@@ -1924,7 +1932,7 @@ function allStudentEvents(){
    국고/교비처럼 같은 이름의 항목도 각각 따로 보여줘서 개별적으로 삭제할 수 있습니다. */
 function importedEvents(){
   return S_EVENTS.filter(e=>(e.source==='import'||e.source==='manual') && !HIDDEN_IDS.has(e.id))
-    .sort((a,b)=>a.start.localeCompare(b.start));
+    .sort((a,b)=>b.start.localeCompare(a.start));
 }
 function deleteImportedEvent(id){
   HIDDEN_IDS.add(id);
@@ -2324,7 +2332,7 @@ function drawImportedList(){
       <td class="num">${r.start}</td>
       <td>${esc(r.name)}</td>
       <td style="font-size:11.5px;color:var(--ink-3)">${esc(r.srcTitle||(r.source==='manual'?'(수기 입력)':''))}</td>
-      <td style="font-size:11.5px">${esc(kind(r.kind).name)}</td>
+      <td style="font-size:11.5px"><select class="imp-kind-sel" data-impkind="${r.id}">${S_KIND.map(k=>`<option value="${k.id}" ${k.id===r.kind?'selected':''}>${esc(k.name)}</option>`).join('')}</select></td>
       <td class="num">${esc(r.amount||'')}</td>
       <td><button class="kd" data-delimp="${r.id}" title="학생용 캘린더에서 삭제">✕</button></td>
     </tr>`).join('')
@@ -2585,6 +2593,18 @@ document.addEventListener('change', e=>{
   if(e.target.id==='fileInput'){
     const f=e.target.files&&e.target.files[0];
     if(f){ $('#fileName').textContent=f.name; readSheet(f); }
+    return;
+  }
+  const ik=e.target.closest('[data-impkind]');
+  if(ik){
+    const ev=S_EVENTS.find(x=>x.id===ik.dataset.impkind);
+    if(ev && ev.kind!==ik.value){
+      ev.kind=ik.value;
+      cloudUpdateEventKind(ev.id, ik.value);
+      drawImportedList();
+      drawStudent();
+      toast('구분을 변경했습니다.');
+    }
     return;
   }
 });

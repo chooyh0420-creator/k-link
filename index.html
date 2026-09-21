@@ -1218,22 +1218,7 @@ async function initCloudSync(){
   drawImportedList();
   if(mode==='student'){ drawStudent(); } else if(mode==='staff'){ drawStaff(); }
 }
-const S_EVENTS=[
- {id:'S1',kind:'apply',name:'2027-1학기 국가장학금 1차 신청',start:'2026-11-20',end:'2026-12-27',
-  desc:'한국장학재단 홈페이지에서 신청합니다. 가구원 동의와 서류 제출까지 마쳐야 신청이 완료됩니다.',where:'한국장학재단'},
- {id:'S2',kind:'pay',name:'교외장학금 12월 지급',start:'2026-12-18',end:'2026-12-18',
-  desc:'외부 재단 장학금이 본인 계좌로 입금됩니다. 계좌 정보가 변경된 경우 미리 수정해주세요.',where:'장학복지팀'},
- {id:'S3',kind:'pay',name:'국가근로장학금 12월분 지급',start:'2026-12-15',end:'2026-12-15',
-  desc:'11월 근로분이 지급됩니다. 출근부 미등록 시 다음 회차로 넘어갈 수 있습니다.',where:'장학복지팀'},
- {id:'S4',kind:'pay',name:'교내근로장학금 12월분 지급',start:'2026-12-15',end:'2026-12-15',
-  desc:'근로 확인서가 제출된 학생에 한해 지급됩니다.',where:'장학복지팀'},
- {id:'S6',kind:'due',name:'2027-1학기 등록금 납부',start:'2027-01-25',end:'2027-02-05',
-  desc:'장학금이 반영된 고지서로 납부합니다. 기간 내 미납 시 미등록 처리됩니다.',where:'재무팀'},
- {id:'S7',kind:'pay',name:'2027-1학기 교내장학금 지급',start:'2027-02-10',end:'2027-02-10',
-  desc:'등록금 수납 확인 후 지급됩니다. 등록금에서 감면된 경우 별도 입금은 없습니다.',where:'장학복지팀'},
- {id:'S8',kind:'apply',name:'2027-1학기 근로장학생 신청',start:'2027-01-05',end:'2027-01-16',
-  desc:'교내근로·국가근로 모두 이 기간에 신청합니다. 소득분위 확인이 필요합니다.',where:'장학복지팀'},
-];
+const S_EVENTS=[];
 
 /* ===== 유틸 ===== */
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));

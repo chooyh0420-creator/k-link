@@ -1106,45 +1106,6 @@ function drawUpdatedAt(){
   els.forEach(el=>{ el.innerHTML=html; });
 }
 
-/* ===== 페이지 하단 공유 & 문의 버튼 ===== */
-(function initPageFoot(){
-  const shareBtn=$('#pageShareBtn');
-  if(shareBtn){
-    const shareData={ title:'계명대학교 K-Link 장학금 캘린더', text:'내 장학금 언제 들어오는지 K-Link에서 확인해보세요!', url:location.href };
-    shareBtn.addEventListener('click', async ()=>{
-      try{
-        if(navigator.share){ await navigator.share(shareData); return; }
-        throw new Error('no share');
-      }catch(e){
-        try{
-          await navigator.clipboard.writeText(location.href);
-          const orig=shareBtn.textContent;
-          shareBtn.textContent='✅ 링크가 복사됐어요!';
-          shareBtn.classList.add('copied');
-          setTimeout(()=>{ shareBtn.textContent=orig; shareBtn.classList.remove('copied'); }, 2000);
-        }catch(err){
-          prompt('아래 주소를 복사해 공유하세요:', location.href);
-        }
-      }
-    });
-  }
-  const fbBtn=$('#pageFeedbackBtn');
-  if(fbBtn){
-    const email='choo@kmu.ac.kr';
-    const subject=encodeURIComponent('[K-Link] 정보 수정·문의');
-    const body=encodeURIComponent('어떤 장학금의 어떤 내용인지 알려주시면 확인하겠습니다.\n\n- 장학금명: \n- 내용: ');
-    const mailto=`mailto:${email}?subject=${subject}&body=${body}`;
-    fbBtn.addEventListener('click', async ()=>{
-      let copied=false;
-      try{ await navigator.clipboard.writeText(email); copied=true; }catch(e){}
-      try{ window.location.href=mailto; }catch(e){}
-      const orig=fbBtn.textContent;
-      fbBtn.textContent = copied ? ('✅ 메일 주소 복사됨 (' + email + ')') : ('✉️ ' + email + ' 로 보내주세요');
-      fbBtn.classList.add('copied');
-      setTimeout(()=>{ fbBtn.textContent=orig; fbBtn.classList.remove('copied'); }, 3000);
-    });
-  }
-})();
 
 /* ===== 클라우드 동기화(Supabase) =====
    K-Link는 지금까지 브라우저 메모리에만 데이터를 담고 있어서, 새로고침하거나
@@ -2724,6 +2685,46 @@ initCloudSync();
     CAL_FILTER_SEL = allOn ? new Set() : new Set(opts.map(o=>o.id));
     saveCalFilterSel(); drawCalFilter(); drawStudent();
   });
+})();
+
+/* ===== 페이지 하단 공유 & 문의 버튼 ===== */
+(function initPageFoot(){
+  const shareBtn=$('#pageShareBtn');
+  if(shareBtn){
+    const shareData={ title:'계명대학교 K-Link 장학금 캘린더', text:'내 장학금 언제 들어오는지 K-Link에서 확인해보세요!', url:location.href };
+    shareBtn.addEventListener('click', async ()=>{
+      try{
+        if(navigator.share){ await navigator.share(shareData); return; }
+        throw new Error('no share');
+      }catch(e){
+        try{
+          await navigator.clipboard.writeText(location.href);
+          const orig=shareBtn.textContent;
+          shareBtn.textContent='✅ 링크가 복사됐어요!';
+          shareBtn.classList.add('copied');
+          setTimeout(()=>{ shareBtn.textContent=orig; shareBtn.classList.remove('copied'); }, 2000);
+        }catch(err){
+          prompt('아래 주소를 복사해 공유하세요:', location.href);
+        }
+      }
+    });
+  }
+  const fbBtn=$('#pageFeedbackBtn');
+  if(fbBtn){
+    const email='choo@kmu.ac.kr';
+    const subject=encodeURIComponent('[K-Link] 정보 수정·문의');
+    const body=encodeURIComponent('어떤 장학금의 어떤 내용인지 알려주시면 확인하겠습니다.\n\n- 장학금명: \n- 내용: ');
+    const mailto=`mailto:${email}?subject=${subject}&body=${body}`;
+    fbBtn.addEventListener('click', async ()=>{
+      let copied=false;
+      try{ await navigator.clipboard.writeText(email); copied=true; }catch(e){}
+      try{ window.location.href=mailto; }catch(e){}
+      const orig=fbBtn.textContent;
+      fbBtn.textContent = copied ? ('✅ 메일 주소 복사됨 (' + email + ')') : ('✉️ ' + email + ' 로 보내주세요');
+      fbBtn.classList.add('copied');
+      setTimeout(()=>{ fbBtn.textContent=orig; fbBtn.classList.remove('copied'); }, 3000);
+    });
+  }
 })();
 </script>
 </body>

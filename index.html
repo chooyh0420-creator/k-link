@@ -344,7 +344,7 @@ main{padding:20px; max-width:1500px; margin:0 auto}
 .side{position:relative}
 .side-head{display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:0 2px}
 .side-head h3{font-size:13px; color:var(--ink-2); margin:0}
-.cal-top{display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--line-soft); flex-wrap:wrap}
+.cal-top{display:flex; align-items:center; gap:10px; padding:14px 16px 10px; flex-wrap:wrap}
 .cal-top h2{font-size:21px; font-variant-numeric:tabular-nums; min-width:140px}
 .navbtn{border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-2);
   width:32px; height:32px; border-radius:6px; font-size:15px; line-height:1}
@@ -353,11 +353,10 @@ main{padding:20px; max-width:1500px; margin:0 auto}
   padding:7px 14px; border-radius:6px; font-size:12.5px; font-weight:700}
 .today-btn:hover{border-color:var(--brand); color:var(--brand)}
 .legend{margin-left:auto; display:flex; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-2)}
-.updated-at{display:flex; align-items:center; gap:6px; padding-left:12px; margin-left:4px;
-  border-left:1px solid var(--line); font-size:11px; color:var(--ink-3); white-space:nowrap}
+.cal-meta{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:0 16px 14px; border-bottom:1px solid var(--line-soft)}
+.updated-at{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--ink-3); white-space:nowrap}
 .updated-at .dot{flex:none; width:6px; height:6px; border-radius:50%; background:var(--brand)}
 .updated-at b{color:var(--ink-2); font-weight:700}
-@media (max-width:640px){.updated-at{border-left:0; padding-left:0; margin-left:0; width:100%; order:9}}
 .legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px}
 .hint{font-size:11.5px; font-weight:600; color:var(--ink-2); padding:8px 16px; border-bottom:1px solid var(--line-soft); background:var(--strip)}
 .dow{display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid var(--line); background:var(--surface-2)}
@@ -1010,8 +1009,10 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
         <button class="navbtn" id="sNextM" aria-label="다음 달">›</button>
         <h2 id="sCalTitle"></h2>
         <button class="today-btn" id="sTodayBtn">오늘</button>
-        <div class="legend" id="sCalLegend"></div>
+      </div>
+      <div class="cal-meta">
         <div class="updated-at" id="sUpdatedAt" title="장학금 지급일 자료를 학생용 캘린더에 마지막으로 올린 시점입니다."></div>
+        <div class="legend" id="sCalLegend"></div>
       </div>
       <div class="cal-filter-row" id="calFilterRow">
         <div class="cal-filter" id="calFilterWrap">
@@ -1100,7 +1101,13 @@ function drawUpdatedAt(){
   if(!PAY_UPDATED_AT){ html='<span class="dot" style="background:var(--ink-3)"></span>자료 업데이트 전'; }
   else{
     const d=new Date(PAY_UPDATED_AT);
-    const txt=isNaN(d) ? '' : d.toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    let txt='';
+    if(!isNaN(d)){
+      const yy=String(d.getFullYear()).slice(-2);
+      const mo=d.getMonth()+1, da=d.getDate();
+      const hh=String(d.getHours()).padStart(2,'0'), mi=String(d.getMinutes()).padStart(2,'0');
+      txt=`${yy}. ${mo}. ${da}. ${hh}:${mi}`;
+    }
     html=`<span class="dot"></span>자료 업데이트 <b>${esc(txt)}</b>`;
   }
   els.forEach(el=>{ el.innerHTML=html; });

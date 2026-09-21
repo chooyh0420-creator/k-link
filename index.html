@@ -712,6 +712,36 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 .cf-item{display:flex; align-items:center; gap:9px; padding:8px 6px; border-radius:8px; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--ink)}
 .cf-item:hover{background:var(--surface-2)}
 .cf-item input{width:16px; height:16px; accent-color:var(--brand); flex:0 0 auto}
+
+/* ================================================================
+   모바일 반응형 — 상단 학교 헤더 + 이용 대상(학생용/직원용) 탭
+   * 파일 맨 끝에 위치시켜 기존 규칙(.visit-pill 등)보다 항상 우선 적용되게 함
+   ================================================================ */
+@media (max-width:600px){
+  .gnb{padding:0 12px}
+  .gnb-in{height:auto; min-height:52px; padding:9px 0; flex-wrap:wrap; gap:8px; row-gap:8px}
+  .logo{width:100%; flex-wrap:wrap; gap:8px; row-gap:6px}
+  .uni-badge{height:30px; padding:4px 9px 4px 5px; gap:6px}
+  .uni-badge .uni-badge-text b{font-size:10.5px}
+  .uni-badge-text small{font-size:6.5px}
+  .logo .bar{display:none}
+  #titleBlock{flex:0 0 100%; width:100%; display:block}
+  .logo .stu-title{display:block; font-size:14px; line-height:1.35; white-space:normal}
+  .logo b{font-size:15px}
+  .logo .sub{display:inline-block; font-size:10px; margin-left:6px}
+  .gnb-in .right{width:100%; justify-content:flex-end; margin-left:0}
+  .visit-pill{padding:4px 11px; gap:7px}
+  .visit-pill .vp-item i{font-size:8.5px}
+  .visit-pill .vp-item b{font-size:11.5px}
+  .who{font-size:10.5px}
+
+  .tabstrip{padding:6px 10px 0}
+  .tabstrip-in{flex-wrap:wrap; row-gap:6px}
+  .mtab{padding:8px 13px 9px; font-size:12px; gap:5px; white-space:nowrap}
+  .mtab .ic{width:14px; height:14px}
+  .mtab[aria-selected="true"]{padding-top:6px; padding-bottom:10px}
+  .strip-note{order:3; width:100%; margin-left:0; padding:4px 2px 8px; font-size:11px}
+}
 </style>
 </head>
 <body>

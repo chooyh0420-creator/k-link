@@ -492,7 +492,7 @@ main{padding:20px; max-width:1500px; margin:0 auto}
 .map-hint{font-size:11.5px; color:var(--ink-3); background:var(--surface-2); border:1px solid var(--line-soft);
   border-radius:6px; padding:9px 12px; margin-bottom:16px}
 
-/* ══ 시연용 잠금 화면 ══ */
+/* ══ 직원용 잠금 화면 ══ */
 .lockwrap{max-width:430px; margin:56px auto; text-align:center}
 .lockwrap .lockcard{background:var(--surface); border:1px solid var(--line);
   border-radius:var(--radius); box-shadow:var(--shadow); padding:34px 30px}
@@ -768,17 +768,14 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
       <svg class="lk-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
         <rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
       <h2>직원용 화면</h2>
-      <p>부서 담당자만 사용하는 화면입니다.<br>시연용 코드를 입력해주세요.</p>
+      <p>부서 담당자만 사용하는 화면입니다.<br>코드를 입력해주세요.</p>
       <div class="lk-form">
         <input type="password" id="lkInput" placeholder="코드 입력" autocomplete="off">
         <button class="btn" id="lkGo">확인</button>
       </div>
       <div class="lk-err" id="lkErr"></div>
       <div class="lk-warn">
-        <b>이 잠금은 보안장치가 아닙니다.</b><br>
-        코드 원문은 화면 소스에 노출되지 않지만, 완전한 보안장치는 아닙니다.
-        시연 중 실수로 내용이 바뀌는 것을 막는 용도이며,
-        실제 운영에서는 학교 계정 로그인으로 교체해야 합니다.
+        부서 담당자만 사용하는 화면이며, 직원용 코드 문의는 장학복지팀으로 문의 바랍니다.
       </div>
     </div>
   </div>
@@ -2379,8 +2376,8 @@ function countVisit(){
   if(b) b.textContent=day.toLocaleString();
 }
 
-/* 시연용 코드 — 원문 대신 SHA-256 해시로 저장해 화면 소스에 코드 원문이 그대로 노출되지 않습니다.
-   (다만 4자리 숫자 특성상 완전한 보안장치는 아닙니다.) 운영 단계에서는 학교 계정 로그인으로 교체합니다. */
+/* 직원용 코드 — 원문 대신 SHA-256 해시로 저장해 화면 소스에 코드 원문이 그대로 노출되지 않습니다.
+   운영 단계에서는 학교 계정 로그인으로 교체합니다. */
 const DEMO_CODE_HASH='0865e9f8c089c3df7d77d407031ee9115721b5bc1eac874ea14fd709b9b3db5b';
 async function sha256Hex(str){
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -2413,7 +2410,7 @@ function setMode(m){
   applyPalette(m);
   $$('.mtab').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.mode===m)));
 
-  /* 직원용은 시연 코드를 입력해야 열립니다 */
+  /* 직원용은 코드를 입력해야 열립니다 */
   const locked = (m==='staff' && !staffUnlocked);
   $('#v-lock').hidden = !locked;
   $('#v-staff').hidden = (m!=='staff') || locked;

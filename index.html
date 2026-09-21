@@ -273,6 +273,8 @@ h1,h2,h3,h4{margin:0; font-weight:700; line-height:1.35}
 .switch-mini input:focus-visible + .track{outline:2px solid var(--brand); outline-offset:2px}
 .kw.ex-off{opacity:.55}
 .kw.ex-off .as{color:var(--ink-3)}
+.cal-pubtoggle{display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600;
+  color:var(--ink-2); cursor:pointer; user-select:none; white-space:nowrap}
 .filebox{border:1.5px dashed var(--line-strong); border-radius:var(--radius); padding:22px 18px;
   text-align:center; background:var(--surface-2)}
 .filebox.drag{border-color:var(--brand); background:var(--brand-soft)}
@@ -880,6 +882,13 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
           <button class="today-btn" id="todayBtn">오늘</button>
           <button class="mini" id="exportCsvBtn" title="업무별 표준기준표 내보내기">표 내보내기</button>
           <button class="mini" id="printBtn" title="이 달력을 인쇄하거나 PDF로 저장">인쇄 · PDF</button>
+          <label class="cal-pubtoggle" title="학생 공개로 켜둔 업무(학생용 캘린더에도 뜨는 신청·지급 안내)를 이 업무 캘린더에도 같이 보여줄지 정합니다.">
+            <span class="switch-mini">
+              <input type="checkbox" id="calShowPub">
+              <span class="track"><span class="knob"></span></span>
+            </span>
+            학생 공개 항목 표시
+          </label>
           <div class="legend" id="calLegend"></div>
         </div>
         <div class="hint">날짜를 누르거나 <b>여러 날을 드래그</b>하면 그 기간으로 업무를 추가할 수 있습니다. 색 막대를 누르면 상세가 열립니다.</div>
@@ -1368,9 +1377,14 @@ let myDept='JH', deptFilter='JH', pending=null;
 let calY=+TODAY.slice(0,4), calM=+TODAY.slice(5,7)-1;
 /* 드래그로 방금 잡아둔 임시 블록 — 확정 전까지 달력에 미리 표시됩니다 */
 let DRAFT=null;   // {start, end, name}
+/* 업무 캘린더에 '학생 공개' 업무(학생용 캘린더에도 뜨는 신청·지급 안내)까지 같이 보여줄지.
+   기본값은 꺼짐(숨김) — 내부 업무만 보이게 하고, 토글을 켜면 학생 공개 업무도 함께 표시합니다.
+   이 화면 설정은 이 브라우저에만 기억됩니다(클라우드 저장 대상 아님). */
+let calShowPublic=false;
+try{ calShowPublic = localStorage.getItem('klink_cal_show_public')==='1'; }catch(_){}
 
 const staffEvents=()=>{
-  const list=TASKS.map(t=>({id:t.id,name:`(${dept(t.dept).name}) ${t.name}`,
+  const list=TASKS.filter(t=>calShowPublic || !t.isPublic).map(t=>({id:t.id,name:`(${dept(t.dept).name}) ${t.name}`,
     start:t.date,end:t.end||t.date,color:dept(t.dept).color,src:'task'}));
   if(DRAFT){
     list.push({id:'__draft', name:DRAFT.name.trim()||'(제목 없음)',
@@ -2861,6 +2875,12 @@ document.documentElement.dataset.palette='slate';
 setTheme('light');       // 기본이자 유일한 화면 — 전환 컨트롤 제거됨
 $('#lkGo').addEventListener('click',tryUnlock);
 $('#lkInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();tryUnlock();} });
+$('#calShowPub').checked = calShowPublic;
+$('#calShowPub').addEventListener('change', e=>{
+  calShowPublic = e.target.checked;
+  try{ localStorage.setItem('klink_cal_show_public', calShowPublic?'1':'0'); }catch(_){}
+  drawStaffCal();
+});
 drawDeptChips(); drawImpactSel(); drawMemos(); drawKeywords(); setMode('student');
 initCloudSync();
 

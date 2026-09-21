@@ -2072,6 +2072,24 @@ function openTask(id){
       <dt>예정일</dt><dd>${t.end&&t.end!==t.date?`${t.date} ~ ${t.end}`:t.date}${t.date!==t.baseDate?` <s style="color:var(--ink-3)">(당초 ${t.baseDate})</s>`:''}</dd>
       <dt>속한 흐름</dt><dd>${esc((FLOWS.find(f=>f.id===t.flow)||{}).name||'-')}</dd></dl>
     ${t.note?`<div class="note" style="margin-bottom:18px">${esc(t.note)}</div>`:''}
+    <div class="dr-sec">
+      <h4>업무 정보 수정</h4>
+      <div class="field"><label for="tiName">업무명</label>
+        <input type="text" id="tiName" value="${esc(t.name)}"></div>
+      <div class="row2">
+        <div class="field"><label for="tiDept">담당 부서</label>
+          <select id="tiDept">${DEPTS.map(d=>`<option value="${d.id}" ${d.id===t.dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
+        <div class="field"><label for="tiOwner">담당자</label>
+          <input type="text" id="tiOwner" value="${esc(t.owner)}"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="tiDate">예정일(시작)</label>
+          <input type="date" id="tiDate" value="${t.date}"></div>
+        <div class="field"><label for="tiEnd">종료일 (선택)</label>
+          <input type="date" id="tiEnd" value="${t.end||''}"></div>
+      </div>
+      <button class="btn btn-sm" id="tiSave" data-task="${t.id}">업무 정보 저장</button>
+    </div>
     <div class="dr-sec"><h4>완료 기준 (${rate}%)</h4>
       <div class="prog-bar"><i style="width:${rate}%"></i></div>
       ${t.criteria.map((c,i)=>`<label class="chk ${c[1]?'on':''}">
@@ -2665,6 +2683,27 @@ $('#drawer').addEventListener('click',e=>{
   (function(e){
   if(e.target.id==='drClose'||e.target.id==='nfCancel'){closeDrawer();return}
   if(e.target.id==='nfSave'){saveNewFull();return}
+  if(e.target.id==='tiSave'){
+    const t=byId(e.target.dataset.task); if(!t) return;
+    const name=$('#tiName').value.trim();
+    if(!name){ toast('업무명을 입력해주세요.'); $('#tiName').focus(); return; }
+    const deptV=$('#tiDept').value;
+    const owner=$('#tiOwner').value.trim()||'미지정';
+    const date=$('#tiDate').value;
+    if(!date){ toast('예정일을 입력해주세요.'); $('#tiDate').focus(); return; }
+    let end=$('#tiEnd').value;
+    if(end && end<date) end=date;
+    const changed = name!==t.name || deptV!==t.dept || owner!==t.owner || date!==t.date || (end||'')!==(t.end||'');
+    if(changed){
+      HISTORY.unshift({at:new Date().toISOString().slice(0,16).replace('T',' '),who:dept(myDept).name+' 담당자',
+        task:t.id, what:'업무 정보 수정 (제목·담당·일정)', why:'담당자 직접 수정', affect:'-'});
+    }
+    t.name=name; t.dept=deptV; t.owner=owner; t.date=date; t.end=end||undefined; t.baseDate=date;
+    afterMapEdit();
+    openTask(t.id);
+    toast('업무 정보를 저장했습니다.');
+    return;
+  }
   if(e.target.id==='pubSave'){
     const t=byId(e.target.dataset.task); if(!t) return;
     t.publicLabel=$('#pubLabel').value.trim();

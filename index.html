@@ -1126,7 +1126,7 @@ let HISTORY=[
 ];
 const S_KIND=[
  {id:'apply',name:'신청',color:'#14386E'},{id:'pay',name:'지급',color:'#116454'},
- {id:'notice',name:'발표',color:'#67408E'},{id:'due',name:'납부·마감',color:'#B22A24'}
+ {id:'due',name:'납부·마감',color:'#B22A24'}
 ];
 /* 학생용 캘린더에 지급일 자료를 마지막으로 올린 시점(자료 신뢰도 표시용) */
 let PAY_UPDATED_AT=null;
@@ -1251,16 +1251,12 @@ const S_EVENTS=[
   desc:'11월 근로분이 지급됩니다. 출근부 미등록 시 다음 회차로 넘어갈 수 있습니다.',where:'장학복지팀'},
  {id:'S4',kind:'pay',name:'교내근로장학금 12월분 지급',start:'2026-12-15',end:'2026-12-15',
   desc:'근로 확인서가 제출된 학생에 한해 지급됩니다.',where:'장학복지팀'},
- {id:'S5',kind:'notice',name:'성적우수장학금 선발 결과 발표',start:'2027-01-15',end:'2027-01-15',
-  desc:'학교 홈페이지 공지사항과 학사정보시스템에서 확인할 수 있습니다.',where:'장학복지팀'},
  {id:'S6',kind:'due',name:'2027-1학기 등록금 납부',start:'2027-01-25',end:'2027-02-05',
   desc:'장학금이 반영된 고지서로 납부합니다. 기간 내 미납 시 미등록 처리됩니다.',where:'재무팀'},
  {id:'S7',kind:'pay',name:'2027-1학기 교내장학금 지급',start:'2027-02-10',end:'2027-02-10',
   desc:'등록금 수납 확인 후 지급됩니다. 등록금에서 감면된 경우 별도 입금은 없습니다.',where:'장학복지팀'},
  {id:'S8',kind:'apply',name:'2027-1학기 근로장학생 신청',start:'2027-01-05',end:'2027-01-16',
   desc:'교내근로·국가근로 모두 이 기간에 신청합니다. 소득분위 확인이 필요합니다.',where:'장학복지팀'},
- {id:'S9',kind:'notice',name:'국가장학금 1차 심사결과 발표',start:'2027-01-08',end:'2027-01-08',
-  desc:'한국장학재단에서 소득분위 산정 결과를 확인할 수 있습니다.',where:'한국장학재단'}
 ];
 
 /* ===== 유틸 ===== */
@@ -1935,7 +1931,7 @@ let sSeq=100;
    같은 데이터를 쓰되, 학생에게는 공개용 이름·안내만 보입니다. */
 function publishedTasks(){
   return TASKS.filter(t=>t.isPublic).map(t=>({
-    id:'P:'+t.id, kind:t.publicKind||'notice',
+    id:'P:'+t.id, kind:t.publicKind||'pay',
     name:(t.publicLabel&&t.publicLabel.trim())||t.name,
     start:t.date, end:t.end||t.date,
     desc:t.publicDesc||'', where:dept(t.dept).name, url:t.publicUrl||'', fromTask:t.id
@@ -2056,7 +2052,7 @@ function openTask(id){
           <input type="text" id="pubLabel" value="${esc(t.publicLabel||'')}" placeholder="비워두면 업무명 그대로 표시"></div>
         <div class="row2">
           <div class="field"><label for="pubKind">구분</label>
-            <select id="pubKind">${S_KIND.map(k=>`<option value="${k.id}" ${k.id===(t.publicKind||'notice')?'selected':''}>${esc(k.name)}</option>`).join('')}</select></div>
+            <select id="pubKind">${S_KIND.map(k=>`<option value="${k.id}" ${k.id===(t.publicKind||'pay')?'selected':''}>${esc(k.name)}</option>`).join('')}</select></div>
           <div class="field"><label for="pubUrl">링크</label>
             <input type="url" id="pubUrl" value="${esc(t.publicUrl||'')}" placeholder="https://"></div>
         </div>

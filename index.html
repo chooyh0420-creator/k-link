@@ -393,7 +393,8 @@ main{padding:20px; max-width:1500px; margin:0 auto}
 .week:last-child{border-bottom:0}
 .wk-grid{position:absolute; inset:0; display:grid; grid-template-columns:repeat(7,1fr)}
 .wk-grid button{border:0; border-right:1px solid var(--line-soft); background:transparent; padding:0;
-  position:relative; cursor:pointer; touch-action:none; user-select:none}
+  position:relative; user-select:none}
+.wk-grid button[data-newday]{cursor:pointer; touch-action:none}
 .wk-grid button:last-child{border-right:0}
 .wk-grid button.off{background:var(--surface-2)}
 .wk-grid button.istoday{background:var(--brand-soft)}

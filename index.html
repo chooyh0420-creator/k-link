@@ -686,6 +686,29 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 #memoList{padding-right:2px}
 .memo-tabs{max-height:60px; overflow-y:auto; margin-bottom:9px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ── 학생용: 보고 싶은 장학금 선택 필터 ── */
+.cal-filter-row{padding:10px 16px; border-bottom:1px solid var(--line-soft); background:var(--surface)}
+.cal-filter{position:relative; display:inline-block}
+.cal-filter-btn{display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:700; color:var(--brand);
+  background:var(--brand-soft); border:1px solid var(--line); border-radius:100px; padding:8px 13px; cursor:pointer}
+.cal-filter-btn .cf-arrow{font-size:10px; color:var(--ink-3); transition:transform .2s}
+.cal-filter-btn[aria-expanded="true"] .cf-arrow{transform:rotate(180deg)}
+.cal-filter-pop{position:absolute; top:calc(100% + 6px); left:0; z-index:30; width:260px; max-width:80vw;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:12px}
+.cf-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+.cf-head span{font-size:11.5px; font-weight:800; color:var(--ink-3)}
+.cf-allbtn{font-size:11px; font-weight:700; color:var(--brand); background:none; border:0; cursor:pointer; text-decoration:underline}
+.cf-list{max-height:240px; overflow-y:auto; display:flex; flex-direction:column; gap:2px}
+.cf-empty{font-size:12px; color:var(--ink-3); padding:8px 2px}
+.cf-item{display:flex; align-items:center; gap:8px; padding:6px 5px; border-radius:7px; cursor:pointer; font-size:12.5px; font-weight:600; color:var(--ink)}
+.cf-item:hover{background:var(--surface-2)}
+.cf-item input{width:15px; height:15px; accent-color:var(--brand); flex:0 0 auto}
+
+/* ── 직원용: 필터 기본값 토글 ── */
+.kdflt{flex:none; border:1px solid var(--line); background:var(--surface-2); color:var(--ink-3); font-size:10.5px; font-weight:700;
+  padding:3px 8px; border-radius:100px; cursor:pointer; white-space:nowrap}
+.kdflt.on{background:var(--brand-soft); color:var(--brand); border-color:var(--brand)}
 </style>
 </head>
 <body>
@@ -918,6 +941,17 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
         <button class="today-btn" id="sTodayBtn">오늘</button>
         <div class="legend" id="sCalLegend"></div>
         <div class="updated-at" id="sUpdatedAt" title="장학금 지급일 자료를 학생용 캘린더에 마지막으로 올린 시점입니다."></div>
+      </div>
+      <div class="cal-filter-row" id="calFilterRow">
+        <div class="cal-filter" id="calFilterWrap">
+          <button type="button" class="cal-filter-btn" id="calFilterBtn" aria-expanded="false">
+            <span id="calFilterSummary">보고 싶은 장학금 선택</span><span class="cf-arrow">▾</span>
+          </button>
+          <div class="cal-filter-pop" id="calFilterPop" hidden>
+            <div class="cf-head"><span>달력에 표시할 장학금</span><button type="button" class="cf-allbtn" id="cfSelAll">전체선택</button></div>
+            <div class="cf-list" id="cfList"></div>
+          </div>
+        </div>
       </div>
       <div class="hint">표시된 일정은 예시입니다. 실제 일정은 학교 공지사항을 확인해주세요.</div>
       <div class="dow"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
@@ -1163,6 +1197,9 @@ async function initCloudSync(){
       }
       if(metaMap.hidden_event_ids){
         try{ HIDDEN_IDS=new Set(JSON.parse(metaMap.hidden_event_ids)); }catch(_){ /* 무시 */ }
+      }
+      if(metaMap.filter_default_ids){
+        try{ FILTER_DEFAULT_IDS=JSON.parse(metaMap.filter_default_ids); }catch(_){ /* 무시 */ }
       }
     }
   }catch(err){
@@ -1911,14 +1948,15 @@ function deleteImportedEvent(id){
   drawStudent();
 }
 const studentEvents=()=>{
-  return allStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter)
+  return filteredStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter)
     .map(e=>({id:e.id,name:e.name,start:e.start,end:e.end,color:kind(e.kind).color,src:'sev'}));
 };
 function drawStudent(){
+  drawCalFilter();
   renderCalendar($('#sCalBody'),$('#sCalTitle'),sCalY,sCalM,studentEvents(),false);
   $('#sCalLegend').innerHTML=S_KIND.map(k=>`<span><i style="background:${k.color}"></i>${k.name}</span>`).join('');
   drawUpdatedAt();
-  const up=allStudentEvents().filter(e=>e.end>=TODAY).sort((a,b)=>a.start.localeCompare(b.start)).slice(0,6);
+  const up=filteredStudentEvents().filter(e=>e.end>=TODAY).sort((a,b)=>a.start.localeCompare(b.start)).slice(0,6);
   $('#sUpN').textContent=up.length;
   $('#sUpList').innerHTML=up.length?up.map(e=>{
     const multi=e.start!==e.end;
@@ -1930,7 +1968,7 @@ function drawStudent(){
     :'<p class="empty">예정된 일정이 없습니다.</p>';
   $('#sChips').innerHTML=[{id:'all',name:'전체'}].concat(S_KIND)
     .map(k=>`<button class="chip" data-skind="${k.id}" aria-pressed="${k.id===sFilter}">${esc(k.name)}</button>`).join('');
-  const rows=allStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter).sort((a,b)=>a.start.localeCompare(b.start));
+  const rows=filteredStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter).sort((a,b)=>a.start.localeCompare(b.start));
   $('#sRows').innerHTML=rows.map(e=>`<tr>
     <td><span class="st" style="color:${kind(e.kind).color};background:var(--surface-2)">${esc(kind(e.kind).name)}</span></td>
     <td><button class="link" data-ev2="${e.id}" data-kindev="sev" style="border:0;background:none;padding:0;font-weight:700;color:var(--brand)">${esc(e.name)}</button></td>
@@ -2080,12 +2118,72 @@ let KEYWORDS=[
 ];
 let kwSeq=10;
 
+/* 학생용 캘린더 "보고 싶은 장학금 선택" 필터의 기본 체크 항목(직원이 지정).
+   방문자가 한 번도 선택한 적 없으면 이 목록 + '기타'가 기본으로 켜집니다. */
+let FILTER_DEFAULT_IDS=[];
+function persistFilterDefaults(){ cloudSetMeta('filter_default_ids', JSON.stringify(FILTER_DEFAULT_IDS)); }
+function toggleFilterDefault(id){
+  if(FILTER_DEFAULT_IDS.includes(id)) FILTER_DEFAULT_IDS=FILTER_DEFAULT_IDS.filter(x=>x!==id);
+  else FILTER_DEFAULT_IDS=FILTER_DEFAULT_IDS.concat([id]);
+  persistFilterDefaults();
+  drawKeywords();
+}
+const CAL_FILTER_OTHER='__other__';
+function filterKeywordFor(name){
+  const base=dedupBaseName(name);
+  return KEYWORDS.find(k=>(k.label && base===k.label) || (k.word && base.includes(k.word))) || null;
+}
+let CAL_FILTER_SEL=null;
+function ensureCalFilterSel(){
+  if(CAL_FILTER_SEL) return CAL_FILTER_SEL;
+  try{
+    const raw=localStorage.getItem('klink_cal_filter_sel');
+    if(raw){ CAL_FILTER_SEL=new Set(JSON.parse(raw)); return CAL_FILTER_SEL; }
+  }catch(_){}
+  CAL_FILTER_SEL=new Set([...FILTER_DEFAULT_IDS, CAL_FILTER_OTHER]);
+  return CAL_FILTER_SEL;
+}
+function saveCalFilterSel(){ try{ localStorage.setItem('klink_cal_filter_sel', JSON.stringify([...CAL_FILTER_SEL])); }catch(_){} }
+function nameFilterPass(e){
+  const sel=ensureCalFilterSel();
+  const k=filterKeywordFor(e.name);
+  return k ? sel.has(k.id) : sel.has(CAL_FILTER_OTHER);
+}
+function filteredStudentEvents(){ return allStudentEvents().filter(nameFilterPass); }
+function calFilterOptions(){
+  /* 현재 학생용 캘린더에 실제로 존재하는 이벤트 기준으로만 선택지를 보여줍니다. */
+  const present=new Set(); let hasOther=false;
+  allStudentEvents().forEach(e=>{ const k=filterKeywordFor(e.name); if(k) present.add(k.id); else hasOther=true; });
+  const opts=KEYWORDS.filter(k=>present.has(k.id)).map(k=>({id:k.id, name:k.label||k.word}));
+  if(hasOther) opts.push({id:CAL_FILTER_OTHER, name:'기타'});
+  return opts;
+}
+function calFilterSummaryText(){
+  const opts=calFilterOptions(), sel=ensureCalFilterSel();
+  if(!opts.length) return '표시할 장학금이 없습니다';
+  const selOpts=opts.filter(o=>sel.has(o.id));
+  if(!selOpts.length) return '선택된 장학금 없음';
+  if(selOpts.length===opts.length) return `전체 보기 (${opts.length}개)`;
+  const names=selOpts.map(o=>o.name);
+  return names.length<=2 ? names.join(', ') : `${names.slice(0,2).join(', ')} 외 ${names.length-2}개`;
+}
+function drawCalFilter(){
+  const btn=$('#calFilterSummary'), list=$('#cfList');
+  if(btn) btn.textContent=calFilterSummaryText();
+  if(!list) return;
+  const opts=calFilterOptions(), sel=ensureCalFilterSel();
+  list.innerHTML = opts.length ? opts.map(o=>`<label class="cf-item"><input type="checkbox" data-cfid="${o.id}" ${sel.has(o.id)?'checked':''}>${esc(o.name)}</label>`).join('')
+    : '<div class="cf-empty">표시할 장학금이 없습니다.</div>';
+}
+
+
 function drawKeywords(){
   $('#kwList').innerHTML = KEYWORDS.length ? KEYWORDS.map(k=>`
     <div class="kw">
       <b>${esc(k.word)}</b>
       ${k.label?`<span class="arrow">→</span><span class="as">${esc(k.label)}</span>`:'<span class="as">→ 결의제목 그대로 표시</span>'}
       <span class="kind-tag">${esc(kind(k.kind).name)}</span>
+      <button class="kdflt ${FILTER_DEFAULT_IDS.includes(k.id)?'on':''}" data-kwdflt="${k.id}" title="학생용 캘린더 필터의 기본 체크 항목으로 지정">${FILTER_DEFAULT_IDS.includes(k.id)?'★ 기본':'☆ 기본'}</button>
       <button class="kd" data-kwdel="${k.id}" title="삭제">✕</button>
     </div>`).join('')
     : '<div class="kwempty">아직 등록한 장학이 없습니다. 아래에서 추가해주세요.</div>';
@@ -2377,6 +2475,8 @@ document.addEventListener('click',e=>{
   if(e.target.id==='exportCsvBtn'){exportCsv();return}
   if(e.target.id==='printBtn'){window.print();return}
   /* 지급일 가져오기 */
+  const kdf=e.target.closest('[data-kwdflt]');
+  if(kdf){ toggleFilterDefault(kdf.dataset.kwdflt); return; }
   const kd=e.target.closest('[data-kwdel]');
   if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId); drawKeywords();
     return; }
@@ -2550,6 +2650,36 @@ $('#lkGo').addEventListener('click',tryUnlock);
 $('#lkInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();tryUnlock();} });
 drawDeptChips(); drawImpactSel(); drawMemos(); drawKeywords(); setMode('student');
 initCloudSync();
+
+/* 학생용 캘린더 — "보고 싶은 장학금 선택" 팝오버 동작 */
+(function(){
+  const btn=$('#calFilterBtn'), pop=$('#calFilterPop'), wrap=$('#calFilterWrap');
+  if(!btn||!pop||!wrap) return;
+  btn.addEventListener('click', e=>{
+    e.stopPropagation();
+    const open=pop.hidden;
+    pop.hidden=!open;
+    btn.setAttribute('aria-expanded', open?'true':'false');
+  });
+  document.addEventListener('click', e=>{
+    if(!wrap.contains(e.target)){ pop.hidden=true; btn.setAttribute('aria-expanded','false'); }
+  });
+  pop.addEventListener('change', e=>{
+    const id=e.target && e.target.dataset ? e.target.dataset.cfid : null;
+    if(!id) return;
+    const sel=ensureCalFilterSel();
+    if(e.target.checked) sel.add(id); else sel.delete(id);
+    saveCalFilterSel(); drawCalFilter(); drawStudent();
+  });
+  const allBtn=$('#cfSelAll');
+  if(allBtn) allBtn.addEventListener('click', ()=>{
+    const opts=calFilterOptions();
+    const sel=ensureCalFilterSel();
+    const allOn = opts.length>0 && opts.every(o=>sel.has(o.id));
+    CAL_FILTER_SEL = allOn ? new Set() : new Set(opts.map(o=>o.id));
+    saveCalFilterSel(); drawCalFilter(); drawStudent();
+  });
+})();
 </script>
 </body>
 </html>

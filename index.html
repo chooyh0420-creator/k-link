@@ -1483,17 +1483,20 @@ function startStaffSave(){
 }
 function scheduleStaffSave(immediate=false){
   if(STAFF_DATA_CONFLICT) return;
-  clearTimeout(staffSaveTimer);
   if(!STAFF_DATA_READY){
     STAFF_DATA_SAVE_QUEUED=true;
     return;
   }
   if(immediate){
+    clearTimeout(staffSaveTimer);
     staffSaveUrgent=true;
     staffSaveTimer=setTimeout(startStaffSave, 0);
     return;
   }
+  /* 즉시 저장을 요청한 동작(추가·삭제·드래그) 뒤에 바깥 클릭 핸들러가
+     일반 저장을 한 번 더 호출해도, 방금 잡은 즉시 저장 타이머를 지우지 않습니다. */
   if(staffSaveUrgent) return;
+  clearTimeout(staffSaveTimer);
   staffSaveTimer=setTimeout(startStaffSave, 700);
 }
 async function flushStaffSave(){

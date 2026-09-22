@@ -1601,6 +1601,7 @@ async function initPublicCloudSync(){
 }
 async function initStaffCloudSync(){
   if(!sb || !hasStaffSession()) return false;
+  let strippedLegacyLinks=false;
   try{
     const [evRes,kwRes,metaRes]=await Promise.all([
       sb.from('klink_student_events').select('*').order('start_date'),
@@ -1634,7 +1635,10 @@ async function initStaffCloudSync(){
         if(snap && typeof snap==='object'){
           if(Array.isArray(snap.TASKS)){
             TASKS=snap.TASKS;
-            TASKS.forEach(t=>{ t.prev=[]; });
+            TASKS.forEach(t=>{
+              if(Array.isArray(t.prev) && t.prev.length) strippedLegacyLinks=true;
+              t.prev=[];
+            });
           }
           if(Array.isArray(snap.FLOWS)){ FLOWS.length=0; FLOWS.push(...snap.FLOWS); }
           if(Array.isArray(snap.HISTORY)) HISTORY=snap.HISTORY;
@@ -1648,6 +1652,7 @@ async function initStaffCloudSync(){
     }
     STAFF_DATA_READY=true;
     if(STAFF_DATA_SAVE_QUEUED){ STAFF_DATA_SAVE_QUEUED=false; scheduleStaffSave(); }
+    if(strippedLegacyLinks) scheduleStaffSave(true);
     redrawCloudViews();
     return true;
   }catch(err){

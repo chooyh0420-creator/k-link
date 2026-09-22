@@ -1413,6 +1413,21 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const linkifyDesc=s=>esc(s).replace(/(https?:\/\/[^\s<]+)/g,m=>`<a href="${m}" target="_blank" rel="noopener">${m}</a>`).replace(/\n/g,'<br>');
 const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
 const diffDays=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
+/* YYYY-MM-DD 형식이면서 실제로 존재하는 날짜인지 확인 (예: 2027-02-30은 거부) */
+function isValidISODate(s){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y,m,d]=s.split('-').map(Number);
+  if(m<1||m>12) return false;
+  const dt=new Date(y,m-1,d);
+  return dt.getFullYear()===y && dt.getMonth()===m-1 && dt.getDate()===d;
+}
+/* 입력 중인 문자열을 YYYY-MM-DD 형태로 자동 정리 (숫자만 남기고 4/6자리 뒤에 하이픈) */
+function maskDateInput(raw){
+  const digits=raw.replace(/\D/g,'').slice(0,8);
+  if(digits.length<=4) return digits;
+  if(digits.length<=6) return digits.slice(0,4)+'-'+digits.slice(4);
+  return digits.slice(0,4)+'-'+digits.slice(4,6)+'-'+digits.slice(6);
+}
 const fmt=iso=>iso?iso.slice(5).replace('-','.'):'-';
 const nextOf=id=>TASKS.filter(t=>t.prev.some(p=>p.id===id));
 const doneRate=t=>t.criteria.length?Math.round(t.criteria.filter(c=>c[1]).length/t.criteria.length*100):0;
@@ -1565,7 +1580,7 @@ function drawFlows(){
         <div class="nd-name" contenteditable="true" data-editname="${t.id}"
              spellcheck="false">${esc(t.name)}</div>
         <div class="nd-row">
-          <input type="date" class="nd-date" value="${t.date}" data-setdate="${t.id}">
+          <input type="text" inputmode="numeric" class="nd-date" value="${t.date}" data-setdate="${t.id}" maxlength="10" placeholder="YYYY-MM-DD">
         </div>
         <div class="nd-row" style="margin-top:5px">
           <select class="nd-st" data-setst="${t.id}">
@@ -2910,6 +2925,17 @@ $('#impTask').addEventListener('change',syncImpDate);
 $('#impCalc').addEventListener('click',showImpact);
 $('#impApply').addEventListener('click',e=>{ applyImpact(e); scheduleStaffSave(); });
 
+/* 업무 연결 지도 카드 날짜칸: 타이핑하는 대로 YYYY-MM-DD 형태를 유지시켜줌 */
+document.addEventListener('input', e=>{
+  const di=e.target.closest && e.target.closest('[data-setdate]');
+  if(!di) return;
+  const before=di.selectionStart||0;
+  const digitsBefore=di.value.slice(0,before).replace(/\D/g,'').length;
+  di.value=maskDateInput(di.value);
+  let pos=0, seen=0;
+  while(pos<di.value.length && seen<digitsBefore){ if(/\d/.test(di.value[pos])) seen++; pos++; }
+  try{ di.setSelectionRange(pos,pos); }catch(_){}
+});
 /* 연결 지도 인라인 편집 저장 */
 document.addEventListener('change', e=>{
   (function(e){
@@ -2972,10 +2998,16 @@ document.addEventListener('blur', e=>{
     if(f){ const v=efn.textContent.trim(); f.note=(v==='설명 추가')?'':v; }
     return; }
   const dt=e.target.closest && e.target.closest('[data-setdate]');
-  if(dt){ const t=byId(dt.dataset.setdate); if(t&&dt.value){
-      const span=t.end?diffDays(t.date,t.end):0;
-      t.date=dt.value; if(span>0) t.end=addDays(dt.value,span);
-      afterMapEdit(); } return; }
+  if(dt){ const t=byId(dt.dataset.setdate); if(t){
+      if(isValidISODate(dt.value)){
+        const span=t.end?diffDays(t.date,t.end):0;
+        t.date=dt.value; if(span>0) t.end=addDays(dt.value,span);
+        afterMapEdit();
+      } else if(dt.value!==t.date){
+        toast('날짜 형식이 올바르지 않습니다. YYYY-MM-DD로 입력해주세요.');
+        dt.value=t.date;
+      }
+    } return; }
   })(e);
   scheduleStaffSave();
 }, true);

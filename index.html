@@ -2921,11 +2921,6 @@ document.addEventListener('change', e=>{
         who:dept(myDept).name+' 담당자',task:t.id,what:`상태 ${t.status} → ${st.value}`,
         why:'연결 지도에서 변경',affect:'-'});
       t.status=st.value; afterMapEdit(); } return; }
-  const dt=e.target.closest('[data-setdate]');
-  if(dt){ const t=byId(dt.dataset.setdate); if(t&&dt.value){
-      const span=t.end?diffDays(t.date,t.end):0;
-      t.date=dt.value; if(span>0) t.end=addDays(dt.value,span);
-      afterMapEdit(); } return; }
   const ld=e.target.closest('[data-lead]');
   if(ld){ const t=byId(ld.dataset.lead);
     if(t){ const link=t.prev.find(p=>p.id===ld.dataset.leadprev);
@@ -2976,6 +2971,11 @@ document.addEventListener('blur', e=>{
   if(efn){ const f=FLOWS.find(x=>x.id===efn.dataset.editflownote);
     if(f){ const v=efn.textContent.trim(); f.note=(v==='설명 추가')?'':v; }
     return; }
+  const dt=e.target.closest && e.target.closest('[data-setdate]');
+  if(dt){ const t=byId(dt.dataset.setdate); if(t&&dt.value){
+      const span=t.end?diffDays(t.date,t.end):0;
+      t.date=dt.value; if(span>0) t.end=addDays(dt.value,span);
+      afterMapEdit(); } return; }
   })(e);
   scheduleStaffSave();
 }, true);

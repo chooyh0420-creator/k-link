@@ -2296,7 +2296,9 @@ function saveNewFull(){
 
 /* ===== 부서 메모 ===== */
 let MEMOS=[];
-let memoFilter='JH', memoSeq=10, replySeq=10, openReply=null;
+/* 메모는 부서와 무관하게 공유되는 게시판이므로 처음부터 전체 보기입니다.
+   특정 부서만 보고 싶을 때만 상단 부서 칩을 눌러 필터링합니다. */
+let memoFilter='all', memoSeq=10, replySeq=10, openReply=null;
 
 function drawMemos(){
   $('#memoTabs').innerHTML=[{id:'all',name:'전체'}].concat(DEPTS.map(d=>({id:d.id,name:d.name})))
@@ -2341,7 +2343,6 @@ function saveMemo(){
   MEMOS.unshift({id:'M'+(memoSeq++), dept:myDept,
     at:new Date().toISOString().slice(0,16).replace('T',' '), text, replies:[]});
   $('#memoInput').value='';
-  if(memoFilter!=='all'&&memoFilter!==myDept) memoFilter=myDept;
   drawMemos(); toast('메모를 남겼습니다.');
 }
 function saveReply(memoId){
@@ -3201,7 +3202,7 @@ async function restoreStaffSession(){
 
 /* ===== 바인딩 ===== */
 $('#deptSel').innerHTML=DEPTS.map(d=>`<option value="${d.id}" ${d.id===myDept?'selected':''}>${esc(d.name)}</option>`).join('');
-$('#deptSel').addEventListener('change',e=>{myDept=e.target.value;deptFilter=myDept;memoFilter=myDept;drawDeptChips();drawDeptRows();drawMemos()});
+$('#deptSel').addEventListener('change',e=>{myDept=e.target.value;deptFilter=myDept;drawDeptChips();drawDeptRows();drawMemos()});
 $$('.mtab').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
 $('#tabBar').addEventListener('click',e=>{
   const tab=e.target.closest('.tab'); if(!tab)return;

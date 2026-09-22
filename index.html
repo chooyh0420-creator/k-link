@@ -1767,7 +1767,7 @@ let calShowPublic=false;
 try{ calShowPublic = localStorage.getItem('klink_cal_show_public')==='1'; }catch(_){}
 
 const staffEvents=()=>{
-  const list=TASKS.filter(t=>calShowPublic || !t.isPublic).map(t=>({id:t.id,name:`(${dept(t.dept).name}) ${t.name}`,
+  const list=TASKS.filter(t=>t.calendarEnabled!==false && (calShowPublic || !t.isPublic)).map(t=>({id:t.id,name:`(${dept(t.dept).name}) ${t.name}`,
     start:t.date,end:t.end||t.date,color:dept(t.dept).color,src:'task'}));
   if(DRAFT){
     list.push({id:'__draft', name:DRAFT.name.trim()||'(제목 없음)',
@@ -1779,7 +1779,7 @@ const staffEvents=()=>{
 function drawStaffCal(){
   renderCalendar($('#calBody'),$('#calTitle'),calY,calM,staffEvents(),true,'+ 업무 추가');
   $('#calLegend').innerHTML=DEPTS.map(d=>`<span><i style="background:${d.color}"></i>${d.name}</span>`).join('');
-  const up=TASKS.filter(t=>t.status!=='완료'&&t.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
+  const up=TASKS.filter(t=>t.calendarEnabled!==false && t.status!=='완료'&&t.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
   $('#upN').textContent=up.length;
   $('#upList').innerHTML=up.length?up.map(t=>`<button class="up" data-task="${t.id}">
     <div class="when"><div class="d">${+t.date.slice(8)}</div><div class="m">${+t.date.slice(5,7)}월</div></div>
@@ -1808,13 +1808,13 @@ function drawFlows(){
     const chain=f.order.map(id=>byId(id)).filter(Boolean);
     const nodes=chain.map((t,i)=>{
       const moved=t.date!==t.baseDate;
-       return `<div class="node edit ${stClass(t.status)}" draggable="true" data-card="${t.id}" data-flow="${f.id}">
-        <div class="nd-top">
-          <span class="nd-grip" title="끌어서 순서 변경">⣿</span>
-          <select class="nd-dept" data-setdept="${t.id}">
-            ${DEPTS.map(d=>`<option value="${d.id}" ${d.id===t.dept?'selected':''}>${esc(d.name)}</option>`).join('')}
-          </select>
-          <button class="nd-del" data-delcard="${t.id}" title="카드 삭제">✕</button>
+       const node=`<div class="node edit ${stClass(t.status)}" draggable="true" data-card="${t.id}" data-flow="${f.id}">
+         <div class="nd-top">
+           <span class="nd-grip" title="끌어서 순서 변경">⣿</span>
+           <select class="nd-dept" data-setdept="${t.id}">
+             ${DEPTS.map(d=>`<option value="${d.id}" ${d.id===t.dept?'selected':''}>${esc(d.name)}</option>`).join('')}
+           </select>
+           <button class="nd-del" data-delcard="${t.id}" data-delcard-flow="${f.id}" title="카드 삭제">✕</button>
         </div>
         <div class="nd-name" contenteditable="true" data-editname="${t.id}"
              spellcheck="false">${esc(t.name)}</div>
@@ -1832,7 +1832,9 @@ function drawFlows(){
           <button class="mini" data-opencard="${t.id}" style="padding:3px 7px;font-size:10.5px">상세</button>
           ${moved?`<span style="font-size:10px;color:var(--s-move)">변경</span>`:''}
         </div>
-      </div>`;
+       </div>`;
+       const arrow=i<chain.length-1?'<div class="arrow" aria-hidden="true"><div class="ln"></div><div class="hd"></div></div>':'';
+       return node+arrow;
     }).join('');
     return `<div class="flow-wrap">
       <div class="flow-head">
@@ -1855,6 +1857,7 @@ function addFlowToStaffCalendar(flowId){
   const f=FLOWS.find(x=>x.id===flowId); if(!f) return;
   const tasks=(f.order||[]).map(id=>byId(id)).filter(t=>t&&t.date);
   if(!tasks.length){ toast('캘린더에 반영할 카드가 없습니다. 먼저 카드를 추가해주세요.'); return; }
+  tasks.forEach(t=>{ t.calendarEnabled=true; });
   const first=[...tasks].sort((a,b)=>a.date.localeCompare(b.date))[0];
   if(tasks.some(t=>t.isPublic) && !calShowPublic){
     calShowPublic=true;
@@ -1867,6 +1870,7 @@ function addFlowToStaffCalendar(flowId){
   const calTab=$('#tabBar .tab[data-p="s-cal"]');
   if(calTab) calTab.click();
   requestAnimationFrame(()=>$('#s-cal').scrollIntoView({behavior:'smooth',block:'start'}));
+  scheduleStaffSave(true);
   toast(`"${f.name}" 일정 ${tasks.length}건을 업무 캘린더에 반영했습니다.`);
 }
 function addCardToFlow(flowId){
@@ -1874,15 +1878,22 @@ function addCardToFlow(flowId){
   const lastId=f.order[f.order.length-1], last=lastId?byId(lastId):null;
   const date=last? addDays(last.end||last.date, 3) : TODAY;
   const t=addTask({name:'새 업무', dept:myDept, owner:'미지정', date, end:date,
-    flow:flowId, prev:[], files:[], criteria:[]});
+    flow:flowId, calendarEnabled:false, files:[], criteria:[]});
    if(!f.order.includes(t.id)) f.order.push(t.id); afterMapEdit();
   const el=document.querySelector(`[data-editname="${t.id}"]`);
   if(el){ el.focus(); const r=document.createRange(); r.selectNodeContents(el);
     const s=window.getSelection(); s.removeAllRanges(); s.addRange(r); }
   scheduleStaffSave(true);
 }
-function deleteCard(id){
+function deleteCard(id,fromMap=false){
   const t=byId(id); if(!t) return;
+  if(fromMap && t.calendarEnabled!==false){
+    const alsoCalendar=window.confirm(`"${t.name}" 일정을 업무 캘린더에서도 삭제하시겠습니까?`);
+    if(!alsoCalendar){
+      FLOWS.forEach(f=>{ f.order=(f.order||[]).filter(x=>x!==id); });
+      afterMapEdit(); scheduleStaffSave(true); toast(`"${t.name}" 카드를 연결 지도에서만 삭제했습니다.`); return;
+    }
+  }
   TASKS=TASKS.filter(x=>x.id!==id);
   TASKS.forEach(x=>{ x.prev=(x.prev||[]).filter(p=>p.id!==id); });
   FLOWS.forEach(f=>{ f.order=(f.order||[]).filter(x=>x!==id); });
@@ -2066,7 +2077,7 @@ function saveQuick(){
   $('#quickpop').hidden=true;
   if(!FLOWS.length){ FLOWS.push({id:'FN'+(flowSeq++), name:'새 업무 흐름', note:'', order:[]}); }
   const t=addTask({name, dept:deptV, owner:'미지정', date:start, end, flow:FLOWS[0].id,
-    files:[], criteria:[]});
+    calendarEnabled:true, files:[], criteria:[]});
   const f=FLOWS.find(x=>x.id===t.flow);
   if(f){ if(!f.order) f.order=[]; if(!f.order.includes(t.id)) f.order.push(t.id); }
   syncOrder(); drawFlows(); drawDeptRows();
@@ -2074,9 +2085,10 @@ function saveQuick(){
   toast(`"${name}" 업무를 추가했습니다. 부서별 업무·연결 지도에도 함께 등록됩니다.`);
 }
 
-function addTask({name,dept,owner,date,end,flow,files,criteria}){
+function addTask({name,dept,owner,date,end,flow,calendarEnabled=true,files,criteria}){
   const t={id:'N'+(seq++), flow, name, dept, owner:owner||'미지정', date,
     end: end&&end!==date?end:undefined, baseDate:date, status:'예정',
+    calendarEnabled,
     prev:[],
     files:files&&files.length?files:['(미등록)'],
     criteria:criteria&&criteria.length?criteria:[['완료 확인',false]], note:''};
@@ -3076,7 +3088,7 @@ document.addEventListener('click',e=>{
    /* 연결 지도 편집 */
    const ac=e.target.closest('[data-addcard]'); if(ac){addCardToFlow(ac.dataset.addcard);return}
    const fc=e.target.closest('[data-flowcalendar]'); if(fc){addFlowToStaffCalendar(fc.dataset.flowcalendar);return}
-   const dc2=e.target.closest('[data-delcard]'); if(dc2){deleteCard(dc2.dataset.delcard);return}
+   const dc2=e.target.closest('[data-delcard]'); if(dc2){deleteCard(dc2.dataset.delcard,!!dc2.dataset.delcardFlow);return}
   const dt2=e.target.closest('[data-deltask]'); if(dt2){deleteCard(dt2.dataset.deltask);closeDrawer();return}
   const df=e.target.closest('[data-delflow]'); if(df){deleteFlow(df.dataset.delflow);return}
   const oc=e.target.closest('[data-opencard]'); if(oc){openTask(oc.dataset.opencard);return}

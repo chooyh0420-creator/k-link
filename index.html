@@ -1490,7 +1490,10 @@ function scheduleStaffSave(immediate=false){
   if(immediate){
     clearTimeout(staffSaveTimer);
     staffSaveUrgent=true;
-    staffSaveTimer=setTimeout(startStaffSave, 0);
+    /* 추가·삭제·드래그처럼 사용자가 저장을 확정한 동작은 타이머를
+       거치지 않고 바로 저장을 시작합니다. 바깥 클릭 이벤트가 이어져도
+       이미 시작된 저장 요청을 취소할 수 없습니다. */
+    startStaffSave();
     return;
   }
   /* 즉시 저장을 요청한 동작(추가·삭제·드래그) 뒤에 바깥 클릭 핸들러가

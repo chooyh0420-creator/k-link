@@ -430,7 +430,11 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .bar:hover{filter:brightness(1.13)}
 .bar[data-kindev="task"]{cursor:grab; touch-action:none}
 .bar[data-kindev="task"]:active,.bar.dragging-event{cursor:grabbing}
-.bar.dragging-event{opacity:.48; filter:saturate(.75)}
+.bar.dragging-event{opacity:.2; filter:saturate(.7)}
+.calendar-drag-ghost{position:fixed!important; z-index:1000; pointer-events:none; margin:0!important;
+  opacity:.98!important; box-shadow:0 10px 24px rgba(18,45,78,.28),0 0 0 2px rgba(255,255,255,.75);
+  transform:translateY(-2px) rotate(-1deg) scale(1.02); transform-origin:center; animation:calendar-drag-lift .16s ease-out}
+@keyframes calendar-drag-lift{from{opacity:.55;transform:translateY(4px) rotate(0) scale(.96)}to{opacity:.98;transform:translateY(-2px) rotate(-1deg) scale(1.02)}}
 .bar:focus-visible{outline:2px solid var(--ink); outline-offset:1px}
 .bar.mid{border-radius:0} .bar.start{border-radius:4px 0 0 4px} .bar.end{border-radius:0 4px 4px 0}
 .bar .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.88);margin-right:6px;vertical-align:1.5px}
@@ -2338,6 +2342,12 @@ function attachStaffTaskDrag(container){
   const clear=()=>{
     container.querySelectorAll('.drop-target').forEach(c=>c.classList.remove('drop-target'));
     if(state&&state.bar) state.bar.classList.remove('dragging-event');
+    if(state&&state.ghost) state.ghost.remove();
+  };
+  const moveGhost=(x,y)=>{
+    if(!state||!state.ghost) return;
+    state.ghost.style.left=Math.round(x-state.grabX)+'px';
+    state.ghost.style.top=Math.round(y-state.grabY)+'px';
   };
   const suppressClick=()=>{
     ignoreCalendarTaskClick=true;
@@ -2361,12 +2371,23 @@ function attachStaffTaskDrag(container){
     const bar=ev.target.closest('.bar[data-kindev="task"]'); if(!bar) return;
     const task=byId(bar.dataset.ev2); if(!task) return;
     ev.preventDefault(); closeQuickpop();
-    state={taskId:task.id,startDate:task.date,targetDate:task.date,moved:false,bar};
+    const rect=bar.getBoundingClientRect();
+    const ghost=bar.cloneNode(true);
+    ghost.removeAttribute('data-ev2'); ghost.removeAttribute('data-kindev');
+    ghost.setAttribute('aria-hidden','true');
+    ghost.classList.add('calendar-drag-ghost');
+    ghost.style.width=Math.round(rect.width)+'px';
+    ghost.style.height=Math.round(rect.height)+'px';
+    document.body.appendChild(ghost);
+    state={taskId:task.id,startDate:task.date,targetDate:task.date,moved:false,bar,ghost,
+      grabX:ev.clientX-rect.left,grabY:ev.clientY-rect.top};
+    moveGhost(ev.clientX,ev.clientY);
     bar.classList.add('dragging-event');
     try{ container.setPointerCapture(ev.pointerId); }catch(_){}
   });
   container.addEventListener('pointermove', ev=>{
     if(!state) return;
+    moveGhost(ev.clientX,ev.clientY);
     const cell=cellAtPoint(ev.clientX,ev.clientY); if(!cell) return;
     const target=cell.dataset.newday;
     if(target===state.targetDate) return;

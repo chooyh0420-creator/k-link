@@ -393,7 +393,7 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 #sHintBox,#noticePreviewBox{overflow:hidden}
 .hint-track{display:inline-block; white-space:nowrap; animation-name:hint-scroll; animation-timing-function:linear; animation-iteration-count:infinite}
 .hint:hover .hint-track{animation-play-state:paused}
-@keyframes hint-scroll{ from{transform:translateX(100%)} to{transform:translateX(-100%)} }
+@keyframes hint-scroll{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
 .dow{display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid var(--line); background:var(--surface-2)}
 .dow div{padding:9px 0; text-align:center; font-size:12px; font-weight:700; color:var(--ink-3)}
 .dow div:first-child{color:var(--s-late)}
@@ -1309,7 +1309,7 @@ function loadNoticeHistSelected(){
 /* 학생용 캘린더 위 실제 흘러가는 안내 문구 상자를 NOTICE_CFG 값으로 채웁니다. */
 function drawHintMarquee(){
   const track=$('#sHintTrack'); if(!track) return;
-  track.textContent=NOTICE_CFG.text;
+  track.innerHTML=`<span>${esc(NOTICE_CFG.text)}</span><span style="padding-left:80px">${esc(NOTICE_CFG.text)}</span>`;
   track.style.animationDuration=NOTICE_CFG.speed+'s';
   track.style.fontSize=NOTICE_CFG.size+'px';
   track.style.color=NOTICE_CFG.color;
@@ -1321,7 +1321,8 @@ function refreshNoticePreview(){
   if(!textEl||!speedEl||!sizeEl||!colorEl||!track) return;
   $('#noticeSpeedVal').textContent=speedEl.value;
   $('#noticeSizeVal').textContent=sizeEl.value;
-  track.textContent=textEl.value.trim()||'(안내 문구를 입력해주세요)';
+  const previewText=textEl.value.trim()||'(안내 문구를 입력해주세요)';
+  track.innerHTML=`<span>${esc(previewText)}</span><span style="padding-left:80px">${esc(previewText)}</span>`;
   track.style.animationDuration=speedEl.value+'s';
   track.style.fontSize=sizeEl.value+'px';
   track.style.color=colorEl.value;

@@ -1982,6 +1982,7 @@ function drawDeptRows(){
 function drawHist(){
   $('#histRows').innerHTML=HISTORY.map(h=>{const t=byId(h.task);
     return `<tr><td class="num">${esc(h.at)}</td><td>${esc(h.who)}</td><td>${esc(t?t.name:h.task)}</td>
+      <td>${esc(h.what)}</td><td>${esc(h.why)}</td></tr>`}).join('');
 }
 function drawStaff(){drawStaffCal();drawFlows();drawDeptRows();drawHist()}
 

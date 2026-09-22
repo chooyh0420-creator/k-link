@@ -808,6 +808,8 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   #sUpdatedAt .opt-label{display:none}
   #t-cal .cal-top{justify-content:center}
   #sCalLegendTop{display:none}
+  .wk-bars .bar{font-size:9.5px; padding:2px 4px; line-height:1.4}
+  .wk-bars .bar .dot{width:4px; height:4px; margin-right:3px}
 
   /* 장학금 일정 전체보기 표 — 좁은 화면에서 '장학금' 열이 한두 글자씩 세로로 깨지는 문제 방지 */
   .stbl-list table{table-layout:fixed}
@@ -1190,8 +1192,8 @@ function drawUpdatedAt(){
     const d=new Date(PAY_UPDATED_AT);
     let txt='';
     if(!isNaN(d)){
-      const yy=String(d.getFullYear()).slice(-2);
-      const mo=d.getMonth()+1, da=d.getDate();
+      const yy=String(d.getFullYear());
+      const mo=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
       const hh=String(d.getHours()).padStart(2,'0'), mi=String(d.getMinutes()).padStart(2,'0');
       txt=`${yy}. ${mo}. ${da}. ${hh}:${mi}`;
     }

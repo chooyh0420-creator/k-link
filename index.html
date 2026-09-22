@@ -1596,7 +1596,7 @@ function addCardToFlow(flowId){
   const date=last? addDays(last.end||last.date, 3) : TODAY;
   const t=addTask({name:'새 업무', dept:myDept, owner:'미지정', date, end:date,
     flow:flowId, prev:null, files:[], criteria:[]});
-  f.order.push(t.id); relink(f); afterMapEdit();
+  if(!f.order.includes(t.id)) f.order.push(t.id); relink(f); afterMapEdit();
   const el=document.querySelector(`[data-editname="${t.id}"]`);
   if(el){ el.focus(); const r=document.createRange(); r.selectNodeContents(el);
     const s=window.getSelection(); s.removeAllRanges(); s.addRange(r); }

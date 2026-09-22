@@ -1188,6 +1188,13 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 <script>
 /* ===== 데이터 계층 — 나중에 이 부분만 API 호출로 교체 ===== */
 const TODAY=(()=>{const d=new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;})(); // 접속 시점의 실제 오늘 날짜
+/* 서버·브라우저 환경과 무관하게 업무 이력과 메모는 한국 표준시로 기록합니다. */
+function nowKSTMinute(){
+  return new Intl.DateTimeFormat('sv-SE',{
+    timeZone:'Asia/Seoul', year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', hour12:false
+  }).format(new Date()).replace('T',' ');
+}
 const STATUS=['예정','진행중','확인요청','확인완료','완료','일정변경','지연','보류'];
 const DEPTS=[
  {id:'JH',name:'장학복지팀',color:'#14386E'},
@@ -1974,7 +1981,7 @@ function moveTaskFromStaffCalendar(taskId,newDate){
   affected.forEach(x=>{ if(x.status==='예정') x.status='일정변경'; });
   const oldLabel=oldEnd&&oldEnd!==oldDate?`${oldDate} ~ ${oldEnd}`:oldDate;
   const newLabel=t.end&&t.end!==t.date?`${t.date} ~ ${t.end}`:t.date;
-  HISTORY.unshift({at:new Date().toISOString().slice(0,16).replace('T',' '),who:dept(myDept).name+' 담당자',
+  HISTORY.unshift({at:nowKSTMinute(),who:dept(myDept).name+' 담당자',
     task:t.id,what:`달력에서 일정 이동 ${oldLabel} → ${newLabel}`,
     why:'직원용 업무 캘린더에서 끌어 이동',
     affect:affected.length===1?affected[0].name:(affected.length?`${affected[0].name} 외 ${affected.length-1}건`:'-')});
@@ -2100,7 +2107,7 @@ function applyImpact(){
   const t=byId(pending.id),old=t.date;
   t.date=pending.nd; if(t.status!=='완료')t.status='일정변경';
   pending.changed.forEach(c=>{const ct=byId(c.id);ct.date=c.to;if(ct.status==='예정')ct.status='일정변경'});
-  HISTORY.unshift({at:new Date().toISOString().slice(0,16).replace('T',' '),who:dept(myDept).name+' 담당자',
+  HISTORY.unshift({at:nowKSTMinute(),who:dept(myDept).name+' 담당자',
     task:t.id,what:`예정일 ${old} → ${t.date}`,why:pending.why||'사유 미입력',
     affect:pending.changed.length?`${byId(pending.changed[0].id).name} 외 ${pending.changed.length-1}건`:'-'});
   toast(`${t.name} 일정을 반영했습니다. 후속 ${pending.changed.length}건 조정됨`);
@@ -2204,7 +2211,7 @@ function addTask({name,dept,owner,date,end,flow,prev,files,criteria}){
     files:files&&files.length?files:['(미등록)'],
     criteria:criteria&&criteria.length?criteria:[['완료 확인',false]], note:''};
   TASKS.push(t);
-  HISTORY.unshift({at:new Date().toISOString().slice(0,16).replace('T',' '),who:dept?DEPTS.find(d=>d.id===dept).name+' 담당자':'담당자',
+  HISTORY.unshift({at:nowKSTMinute(),who:dept?DEPTS.find(d=>d.id===dept).name+' 담당자':'담당자',
     task:t.id, what:`업무 신규 등록 (${date}${t.end?' ~ '+t.end:''})`, why:'담당자 직접 추가',
     affect:t.prev.length?`선행: ${byId(t.prev[0].id).name}`:'-'});
   drawStaff(); drawImpactSel();
@@ -2349,7 +2356,7 @@ function saveMemo(){
   const text=$('#memoInput').value.trim();
   if(!text){toast('메모 내용을 입력해주세요.');$('#memoInput').focus();return}
   MEMOS.unshift({id:'M'+(memoSeq++), dept:myDept,
-    at:new Date().toISOString().slice(0,16).replace('T',' '), text, replies:[]});
+    at:nowKSTMinute(), text, replies:[]});
   $('#memoInput').value='';
   drawMemos(); toast('메모를 남겼습니다.');
 }
@@ -2360,7 +2367,7 @@ function saveReply(memoId){
   const m=MEMOS.find(x=>x.id===memoId); if(!m) return;
   if(!m.replies) m.replies=[];
   m.replies.push({id:'R'+(replySeq++), dept:myDept,
-    at:new Date().toISOString().slice(0,16).replace('T',' '), text});
+    at:nowKSTMinute(), text});
   openReply=null; drawMemos(); toast('답글을 남겼습니다.');
 }
 
@@ -3338,7 +3345,7 @@ $('#drawer').addEventListener('click',e=>{
     if(end && end<date) end=date;
     const changed = name!==t.name || deptV!==t.dept || owner!==t.owner || date!==t.date || (end||'')!==(t.end||'');
     if(changed){
-      HISTORY.unshift({at:new Date().toISOString().slice(0,16).replace('T',' '),who:dept(myDept).name+' 담당자',
+      HISTORY.unshift({at:nowKSTMinute(),who:dept(myDept).name+' 담당자',
         task:t.id, what:'업무 정보 수정 (제목·담당·일정)', why:'담당자 직접 수정', affect:'-'});
     }
     t.name=name; t.dept=deptV; t.owner=owner; t.date=date; t.end=end||undefined; t.baseDate=date;
@@ -3360,7 +3367,7 @@ $('#drawer').addEventListener('click',e=>{
   if(e.target.id==='stSave'){
     const t=byId(e.target.dataset.task),ns=$('#stSel').value;
     if(ns!==t.status){
-      HISTORY.unshift({at:new Date().toISOString().slice(0,16).replace('T',' '),who:dept(myDept).name+' 담당자',
+      HISTORY.unshift({at:nowKSTMinute(),who:dept(myDept).name+' 담당자',
         task:t.id,what:`상태 ${t.status} → ${ns}`,why:'담당자 직접 변경',affect:'-'});
       t.status=ns;toast('상태를 저장했습니다.');drawStaff();openTask(t.id);
     }
@@ -3400,7 +3407,7 @@ document.addEventListener('change', e=>{
   if(sd){ const t=byId(sd.dataset.setdept); if(t){ t.dept=sd.value; afterMapEdit(); } return; }
   const st=e.target.closest('[data-setst]');
   if(st){ const t=byId(st.dataset.setst); if(t&&t.status!==st.value){
-      HISTORY.unshift({at:new Date().toISOString().slice(0,16).replace('T',' '),
+      HISTORY.unshift({at:nowKSTMinute(),
         who:dept(myDept).name+' 담당자',task:t.id,what:`상태 ${t.status} → ${st.value}`,
         why:'연결 지도에서 변경',affect:'-'});
       t.status=st.value; afterMapEdit(); } return; }

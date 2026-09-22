@@ -513,6 +513,13 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .nd-row{display:flex; align-items:center; gap:5px}
 .nd-date{flex:1; min-width:0; font-family:inherit; font-size:11px; padding:3px 5px;
   border:1px solid var(--line-soft); border-radius:4px; background:var(--surface); color:var(--ink-2)}
+.nd-endrow{display:flex; align-items:center; gap:4px; margin-top:4px}
+.nd-tilde{font-size:11px; color:var(--ink-3)}
+.nd-endx{flex:none; border:none; background:transparent; color:var(--ink-3); cursor:pointer; font-size:11px; padding:2px 3px; line-height:1}
+.nd-endx:hover{color:var(--s-late)}
+.nd-addend{border:none; background:transparent; color:var(--ink-3); font-size:10.5px; padding:3px 0 0;
+  text-align:left; cursor:pointer; text-decoration:underline; display:block}
+.nd-addend:hover{color:var(--brand)}
 .nd-st{font-family:inherit; font-size:10.5px; font-weight:700; padding:2px 4px; border-radius:4px;
   border:1px solid var(--line-soft); background:var(--surface); color:var(--ink-2); max-width:78px}
 .lead-in{width:40px; font-family:inherit; font-size:10px; text-align:center; padding:2px 3px;
@@ -1582,6 +1589,11 @@ function drawFlows(){
         <div class="nd-row">
           <input type="text" inputmode="numeric" class="nd-date" value="${t.date}" data-setdate="${t.id}" maxlength="10" placeholder="YYYY-MM-DD">
         </div>
+        ${t.end && t.end!==t.date ? `<div class="nd-endrow">
+          <span class="nd-tilde">~</span>
+          <input type="text" inputmode="numeric" class="nd-date" value="${t.end}" data-setend="${t.id}" maxlength="10" placeholder="YYYY-MM-DD">
+          <button class="nd-endx" data-delend="${t.id}" title="종료일 삭제">✕</button>
+        </div>` : `<button type="button" class="nd-addend" data-addend="${t.id}">+ 종료일(기간으로 표시)</button>`}
         <div class="nd-row" style="margin-top:5px">
           <select class="nd-st" data-setst="${t.id}">
             ${STATUS.map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('')}
@@ -2780,6 +2792,12 @@ document.addEventListener('click',e=>{
   const dt2=e.target.closest('[data-deltask]'); if(dt2){deleteCard(dt2.dataset.deltask);closeDrawer();return}
   const df=e.target.closest('[data-delflow]'); if(df){deleteFlow(df.dataset.delflow);return}
   const oc=e.target.closest('[data-opencard]'); if(oc){openTask(oc.dataset.opencard);return}
+  const ae=e.target.closest('[data-addend]');
+  if(ae){ const t=byId(ae.dataset.addend); if(t){ t.end=t.date; afterMapEdit();
+      const el=document.querySelector(`[data-setend="${t.id}"]`); if(el){ el.focus(); el.select(); } }
+    return; }
+  const de2=e.target.closest('[data-delend]');
+  if(de2){ const t=byId(de2.dataset.delend); if(t){ t.end=undefined; afterMapEdit(); } return; }
   if(e.target.id==='addFlowBtn'){addFlow();return}
   if(e.target.id==='autoFitBtn'){autoFit();return}
   if(e.target.id==='addDeptTaskBtn'){
@@ -2927,7 +2945,7 @@ $('#impApply').addEventListener('click',e=>{ applyImpact(e); scheduleStaffSave()
 
 /* 업무 연결 지도 카드 날짜칸: 타이핑하는 대로 YYYY-MM-DD 형태를 유지시켜줌 */
 document.addEventListener('input', e=>{
-  const di=e.target.closest && e.target.closest('[data-setdate]');
+  const di=e.target.closest && e.target.closest('[data-setdate],[data-setend]');
   if(!di) return;
   const before=di.selectionStart||0;
   const digitsBefore=di.value.slice(0,before).replace(/\D/g,'').length;
@@ -3007,6 +3025,12 @@ document.addEventListener('blur', e=>{
         toast('날짜 형식이 올바르지 않습니다. YYYY-MM-DD로 입력해주세요.');
         dt.value=t.date;
       }
+    } return; }
+  const de=e.target.closest && e.target.closest('[data-setend]');
+  if(de){ const t=byId(de.dataset.setend); if(t){
+      if(de.value.trim()===''){ t.end=undefined; afterMapEdit(); }
+      else if(isValidISODate(de.value) && de.value>=t.date){ t.end=de.value; afterMapEdit(); }
+      else{ toast('종료일 형식이 올바르지 않거나 시작일보다 빠릅니다.'); afterMapEdit(); }
     } return; }
   })(e);
   scheduleStaffSave();

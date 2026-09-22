@@ -1784,6 +1784,7 @@ function drawFlows(){
       <div class="flow-head">
         <span class="flow-name" contenteditable="true" data-editflow="${f.id}" spellcheck="false">${esc(f.name)}</span>
         <span class="flow-note" contenteditable="true" data-editflownote="${f.id}" spellcheck="false">${esc(f.note||'설명 추가')}</span>
+        <button class="mini" data-flowcalendar="${f.id}" title="이 흐름의 카드 일정을 직원용 업무 캘린더에서 확인합니다">📅 캘린더 추가</button>
         <button class="mini danger" data-delflow="${f.id}">흐름 삭제</button>
       </div>
       <div class="chain" data-chain="${f.id}">
@@ -1794,6 +1795,26 @@ function drawFlows(){
 }
 
 /* ── 카드/흐름 편집 동작 ── */
+/* 연결 지도와 업무 캘린더는 같은 TASKS를 사용합니다. 따라서 업무를 복제하지 않고,
+   이 흐름의 일정이 보이는 달의 직원용 업무 캘린더로 바로 이동합니다. */
+function addFlowToStaffCalendar(flowId){
+  const f=FLOWS.find(x=>x.id===flowId); if(!f) return;
+  const tasks=(f.order||[]).map(id=>byId(id)).filter(t=>t&&t.date);
+  if(!tasks.length){ toast('캘린더에 반영할 카드가 없습니다. 먼저 카드를 추가해주세요.'); return; }
+  const first=[...tasks].sort((a,b)=>a.date.localeCompare(b.date))[0];
+  if(tasks.some(t=>t.isPublic) && !calShowPublic){
+    calShowPublic=true;
+    try{ localStorage.setItem('klink_cal_show_public','1'); }catch(_){}
+    const toggle=$('#calShowPub'); if(toggle) toggle.checked=true;
+  }
+  calY=+first.date.slice(0,4);
+  calM=+first.date.slice(5,7)-1;
+  drawStaffCal();
+  const calTab=$('#tabBar .tab[data-p="s-cal"]');
+  if(calTab) calTab.click();
+  requestAnimationFrame(()=>$('#s-cal').scrollIntoView({behavior:'smooth',block:'start'}));
+  toast(`"${f.name}" 일정 ${tasks.length}건을 업무 캘린더에 반영했습니다.`);
+}
 function addCardToFlow(flowId){
   const f=FLOWS.find(x=>x.id===flowId); if(!f) return;
   const lastId=f.order[f.order.length-1], last=lastId?byId(lastId):null;
@@ -2964,9 +2985,10 @@ $('#tabBar').addEventListener('click',e=>{
 });
 document.addEventListener('click',e=>{
   (function(e){
-  /* 연결 지도 편집 */
-  const ac=e.target.closest('[data-addcard]'); if(ac){addCardToFlow(ac.dataset.addcard);return}
-  const dc2=e.target.closest('[data-delcard]'); if(dc2){deleteCard(dc2.dataset.delcard);return}
+   /* 연결 지도 편집 */
+   const ac=e.target.closest('[data-addcard]'); if(ac){addCardToFlow(ac.dataset.addcard);return}
+   const fc=e.target.closest('[data-flowcalendar]'); if(fc){addFlowToStaffCalendar(fc.dataset.flowcalendar);return}
+   const dc2=e.target.closest('[data-delcard]'); if(dc2){deleteCard(dc2.dataset.delcard);return}
   const dt2=e.target.closest('[data-deltask]'); if(dt2){deleteCard(dt2.dataset.deltask);closeDrawer();return}
   const df=e.target.closest('[data-delflow]'); if(df){deleteFlow(df.dataset.delflow);return}
   const oc=e.target.closest('[data-opencard]'); if(oc){openTask(oc.dataset.opencard);return}

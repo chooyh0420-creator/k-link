@@ -2304,7 +2304,9 @@ function drawMemos(){
   $('#memoTabs').innerHTML=[{id:'all',name:'전체'}].concat(DEPTS.map(d=>({id:d.id,name:d.name})))
     .map(d=>`<button class="memo-tab" data-memotab="${d.id}" aria-pressed="${d.id===memoFilter}">${esc(d.name)}</button>`).join('');
   $('#memoWho').textContent=`${dept(myDept).name} 이름으로 저장`;
-  const rows=MEMOS.filter(m=>memoFilter==='all'||m.dept===memoFilter);
+  /* 부서 칩은 작성 부서 표시용 선택 상태만 바꾸고, 메모 목록은
+     어느 부서를 눌러도 기존 메모까지 모두 이어서 보여주는 공유 게시판입니다. */
+  const rows=MEMOS;
   $('#memoN').textContent=rows.length;
   const fn=$('#foldN'); if(fn) fn.textContent=rows.length;
   $('#memoList').innerHTML=rows.length?rows.map(m=>{

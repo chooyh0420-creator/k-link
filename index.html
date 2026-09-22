@@ -1887,13 +1887,14 @@ function addCardToFlow(flowId){
   const el=document.querySelector(`[data-editname="${t.id}"]`);
   if(el){ el.focus(); const r=document.createRange(); r.selectNodeContents(el);
     const s=window.getSelection(); s.removeAllRanges(); s.addRange(r); }
+  scheduleStaffSave(true);
 }
 function deleteCard(id){
   const t=byId(id); if(!t) return;
   TASKS=TASKS.filter(x=>x.id!==id);
   TASKS.forEach(x=>{ x.prev=x.prev.filter(p=>p.id!==id); });
   FLOWS.forEach(f=>{ f.order=(f.order||[]).filter(x=>x!==id); relink(f); });
-  afterMapEdit(); toast(`"${t.name}" 카드를 삭제했습니다.`);
+  afterMapEdit(); scheduleStaffSave(true); toast(`"${t.name}" 카드를 삭제했습니다.`);
 }
 function addFlow(){
   const id='FN'+(flowSeq++);
@@ -1902,11 +1903,12 @@ function addFlow(){
   const el=document.querySelector(`[data-editflow="${id}"]`);
   if(el){ el.focus(); const r=document.createRange(); r.selectNodeContents(el);
     const s=window.getSelection(); s.removeAllRanges(); s.addRange(r); }
+  scheduleStaffSave(true);
 }
 function deleteFlow(id){
   const f=FLOWS.find(x=>x.id===id); if(!f) return;
   if(f.order.length){ toast('카드를 모두 지운 뒤 흐름을 삭제할 수 있습니다.'); return; }
-  const i=FLOWS.findIndex(x=>x.id===id); FLOWS.splice(i,1); drawFlows();
+  const i=FLOWS.findIndex(x=>x.id===id); FLOWS.splice(i,1); drawFlows(); scheduleStaffSave(true);
 }
 /* 선행 완료 후 필요일수를 지키도록 날짜를 뒤로만 밀어 정렬 */
 function fitConnectedDates(skipId){

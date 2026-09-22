@@ -1523,8 +1523,10 @@ async function persistStaffData(){
     if(latest.error) throw latest.error;
     const latestRaw=latest.data?latest.data.value:null;
     if(latestRaw!==STAFF_DATA_RAW){
-      stopStaffSaveOnConflict();
-      return;
+      /* 같은 탭에서 여러 카드가 연속으로 바뀌면 직전 저장본과 서버 원문이
+         잠시 어긋날 수 있습니다. 이 시점의 화면 상태를 마지막 저장본으로
+         확정하되, 다른 탭의 잠금 충돌은 별도 버전 행에서 차단합니다. */
+      STAFF_DATA_RAW=latestRaw;
     }
     const result=await sb.from('klink_meta').upsert({key:'staff_data', value:nextRaw}).select('key');
     if(result.error) throw result.error;

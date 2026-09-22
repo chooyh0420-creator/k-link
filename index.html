@@ -392,6 +392,7 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .hint{font-size:11.5px; font-weight:600; color:var(--ink-2); padding:8px 16px; border-bottom:1px solid var(--line-soft); background:var(--strip)}
 #sHintBox,#noticePreviewBox{overflow:hidden}
 .hint-track{display:inline-block; white-space:nowrap; animation-name:hint-scroll; animation-timing-function:linear; animation-iteration-count:infinite}
+.hint:hover .hint-track{animation-play-state:paused}
 @keyframes hint-scroll{ from{transform:translateX(100%)} to{transform:translateX(-100%)} }
 .dow{display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid var(--line); background:var(--surface-2)}
 .dow div{padding:9px 0; text-align:center; font-size:12px; font-weight:700; color:var(--ink-3)}
@@ -1072,10 +1073,15 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
       <div class="step-h"><span class="step-n">5</span><h3>학생용 안내 문구 설정</h3>
         <span class="sub">학생용 캘린더 위에 왼쪽으로 흘러가는 안내 문구입니다. 문구·속도·글자 크기·색상을 바로 바꿀 수 있습니다.</span></div>
       <div class="field"><label for="noticeText">안내 문구</label>
-        <textarea id="noticeText" rows="2" placeholder="학생용 캘린더 위에 흘러갈 문구를 입력해주세요"></textarea></div>
+        <textarea id="noticeText" rows="2" placeholder="학생용 캘린더 위에 흘러갈 문구를 입력해주세요"></textarea>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap">
+          <select id="noticeHistSel" style="flex:1; min-width:220px; max-width:420px"></select>
+          <button type="button" class="btn ghost btn-sm" id="noticeHistLoad">이전 문구 불러오기</button>
+        </div>
+      </div>
       <div class="kwform" style="grid-template-columns:1fr 1fr 1fr auto">
         <div class="field"><label for="noticeSpeed">흐르는 속도 (한 바퀴 도는 데 <span id="noticeSpeedVal">18</span>초)</label>
-          <input type="range" id="noticeSpeed" min="6" max="40" step="1"></div>
+          <input type="range" id="noticeSpeed" min="6" max="60" step="1"></div>
         <div class="field"><label for="noticeSize">글자 크기 (<span id="noticeSizeVal">12.5</span>px)</label>
           <input type="range" id="noticeSize" min="10" max="20" step="0.5"></div>
         <div class="field"><label for="noticeColor">글자 색상</label>
@@ -1268,6 +1274,38 @@ function persistExcludeKeywords(){
 function persistNoticeCfg(){
   cloudSetMeta('notice_config', JSON.stringify(NOTICE_CFG));
 }
+function persistNoticeHistory(){
+  cloudSetMeta('notice_config_history', JSON.stringify(NOTICE_HISTORY));
+}
+/* 문구 저장 이력 드롭다운을 최신 NOTICE_HISTORY로 다시 채웁니다. */
+function renderNoticeHistSelect(){
+  const sel=$('#noticeHistSel'); if(!sel) return;
+  if(!NOTICE_HISTORY.length){
+    sel.innerHTML='<option value="">저장된 이전 문구 이력이 없습니다</option>';
+    return;
+  }
+  sel.innerHTML='<option value="">이전에 저장했던 문구 불러오기 (최근 '+NOTICE_HISTORY.length+'개 보관)</option>'+
+    NOTICE_HISTORY.map((h,i)=>{
+      let when='';
+      try{ const d=new Date(h.savedAt); when=`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }catch(_){ }
+      const preview=(h.text||'').slice(0,30).replace(/\s+/g,' ');
+      return `<option value="${i}">[${esc(when)}] ${esc(preview)}${(h.text||'').length>30?'...':''}</option>`;
+    }).join('');
+}
+/* '이전 문구 불러오기' 버튼 — 선택한 이력을 입력칸에만 채워주고, 실제 반영은
+   여전히 '저장' 버튼을 눌러야 하도록 해서 실수로 바로 덮어쓰지 않게 합니다. */
+function loadNoticeHistSelected(){
+  const sel=$('#noticeHistSel');
+  const idx=sel && sel.value!==''? +sel.value : -1;
+  const h=NOTICE_HISTORY[idx];
+  if(!h){ toast('불러올 이전 문구를 선택해주세요.'); return; }
+  $('#noticeText').value=h.text||'';
+  $('#noticeSpeed').value=h.speed||18;
+  $('#noticeSize').value=h.size||12.5;
+  $('#noticeColor').value=h.color||'#415670';
+  refreshNoticePreview();
+  toast('이전 문구를 불러왔습니다. 내용을 확인한 뒤 "저장"을 눌러야 실제로 반영됩니다.');
+}
 /* 학생용 캘린더 위 실제 흘러가는 안내 문구 상자를 NOTICE_CFG 값으로 채웁니다. */
 function drawHintMarquee(){
   const track=$('#sHintTrack'); if(!track) return;
@@ -1297,20 +1335,27 @@ function drawNoticeSettings(){
   sizeEl.value=NOTICE_CFG.size;
   colorEl.value=NOTICE_CFG.color;
   refreshNoticePreview();
+  renderNoticeHistSelect();
 }
 /* '저장' 버튼 — 입력값을 검증해 NOTICE_CFG에 반영하고, 클라우드에 저장한 뒤
    실제 학생용 화면의 흘러가는 문구도 바로 바꿉니다. */
 function saveNoticeCfg(){
   const text=$('#noticeText').value.trim();
   if(!text){ toast('안내 문구를 입력해주세요.'); $('#noticeText').focus(); return; }
+  if(NOTICE_CFG.text && NOTICE_CFG.text!==text){
+    NOTICE_HISTORY.unshift(Object.assign({}, NOTICE_CFG, {savedAt:new Date().toISOString()}));
+    NOTICE_HISTORY=NOTICE_HISTORY.slice(0,5);
+    persistNoticeHistory();
+  }
   NOTICE_CFG={
     text,
-    speed:Math.max(6, Math.min(40, +$('#noticeSpeed').value||18)),
+    speed:Math.max(6, Math.min(60, +$('#noticeSpeed').value||18)),
     size:Math.max(10, Math.min(20, +$('#noticeSize').value||12.5)),
     color:$('#noticeColor').value||'#415670'
   };
   persistNoticeCfg();
   drawHintMarquee();
+  renderNoticeHistSelect();
   toast('안내 문구를 저장했습니다. 학생용 캘린더에 바로 반영됩니다.');
 }
 /* 업무 캘린더·부서별 업무·연결 지도·변경 이력·메모(TASKS/FLOWS/HISTORY/MEMOS)를
@@ -1380,6 +1425,10 @@ async function initCloudSync(){
     }else{
       persistNoticeCfg(); // 클라우드에 아직 없으면 기본 문구를 최초 1회 저장해둡니다.
     }
+    if(metaMap.notice_config_history){
+      try{ NOTICE_HISTORY=JSON.parse(metaMap.notice_config_history)||[]; }catch(_){ NOTICE_HISTORY=[]; }
+    }
+    renderNoticeHistSelect();
     if(metaMap.staff_data){
       try{
         const snap=JSON.parse(metaMap.staff_data);
@@ -2370,6 +2419,7 @@ let NOTICE_CFG={
   text:'본 장학금 지급일 캘린더는 참고용 안내이며 실제 지급일은 학생계좌 오류, 지급은행 오류 등으로 인해 달라질 수 있습니다. 현재 캘린더에 보이지 않는 장학일정은 아직 지급일이 미정인 장학이니 조금 더 기다려 주세요.',
   speed:18, size:12.5, color:'#415670'
 };
+let NOTICE_HISTORY=[]; // 안내 문구를 저장할 때마다 이전 값을 최근 5개까지 자동 보관합니다(실수로 덮어써도 복구 가능).
 
 /* 학생용 캘린더 "장학 종류를 선택해주세요" 필터.
    기본값은 항상 '전체'입니다. 키워드와 매칭되지 않는 일정(수기 추가·학생공개 등)은
@@ -3091,6 +3141,7 @@ $('#calShowPub').addEventListener('change', e=>{
   const el=$('#'+id); if(el) el.addEventListener('input', refreshNoticePreview);
 });
 $('#noticeSave').addEventListener('click', saveNoticeCfg);
+$('#noticeHistLoad').addEventListener('click', loadNoticeHistSelected);
 drawDeptChips(); drawImpactSel(); drawMemos(); drawKeywords(); drawNoticeSettings(); setMode('student');
 initCloudSync();
 

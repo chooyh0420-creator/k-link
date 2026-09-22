@@ -974,33 +974,15 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 
   <section class="panel" id="s-map" hidden>
     <div class="sec-head"><h2>업무 연결 지도</h2>
-      <p>카드를 직접 만들고 끌어서 순서를 잡습니다. 순서를 바꾸면 선행·후속 관계가 자동으로 다시 이어집니다.</p></div>
+      <p>카드를 직접 만들고 끌어서 업무 흐름의 순서를 정리합니다.</p></div>
     <div class="map-bar">
       <button class="mini" id="addFlowBtn">+ 새 업무 흐름</button>
-      <button class="mini" id="autoFitBtn">일정 자동 정렬</button>
     </div>
     <div class="map-hint">
       카드의 <b>제목·흐름 이름</b>은 글자를 눌러 바로 고칠 수 있고, 카드를 <b>끌어다 놓으면</b> 순서가 바뀝니다.
-      화살표 가운데 숫자는 <b>선행 완료 후 필요한 일수</b>이며, 이 값이 일정 변경 영향 계산에 그대로 쓰입니다.
+      업무 일정은 각 카드에 직접 입력한 날짜를 기준으로 관리합니다.
     </div>
     <div id="flows"></div>
-  </section>
-
-  <section class="panel" id="s-impact" hidden>
-    <div class="sec-head"><h2>일정 변경 영향 확인</h2>
-      <p>날짜를 바꾸면 영향을 받는 후속 업무를 먼저 보여줍니다. 확인 후 반영할지 직접 선택합니다.</p></div>
-    <div class="grid2">
-      <div class="card box">
-        <div class="field"><label for="impTask">일정을 변경할 업무</label><select id="impTask"></select></div>
-        <div class="field"><label for="impDate">변경할 예정일</label><input type="date" id="impDate"></div>
-        <div class="field"><label for="impWhy">변경 사유</label><input type="text" id="impWhy" placeholder="예: 성적 이의신청 기간 연장"></div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap">
-          <button class="btn ghost" id="impCalc">영향 확인</button>
-          <button class="btn" id="impApply" disabled>변경 반영</button>
-        </div>
-      </div>
-      <div class="card box" id="impResult"><p class="empty">업무와 날짜를 고른 뒤 <b>영향 확인</b>을 눌러주세요.</p></div>
-    </div>
   </section>
 
   <section class="panel" id="s-dept" hidden>
@@ -1016,7 +998,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
     </div>
     <div class="filters" id="deptChips"></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>업무</th><th>담당</th><th>예정일</th><th>상태</th><th>선행 업무</th><th>완료</th><th>학생 공개</th><th></th></tr></thead>
+      <thead><tr><th>업무</th><th>담당</th><th>예정일</th><th>상태</th><th>완료</th><th>학생 공개</th><th></th></tr></thead>
       <tbody id="deptRows"></tbody></table></div>
   </section>
 
@@ -1111,9 +1093,9 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   </section>
 
   <section class="panel" id="s-hist" hidden>
-    <div class="sec-head"><h2>변경 이력</h2><p>누가 언제 무엇을 바꿨고, 어떤 업무가 영향을 받았는지 남깁니다.</p></div>
+    <div class="sec-head"><h2>변경 이력</h2><p>누가 언제 무엇을 바꿨는지 남깁니다.</p></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>일시</th><th>변경자</th><th>대상 업무</th><th>변경 내용</th><th>사유</th><th>영향</th></tr></thead>
+      <thead><tr><th>일시</th><th>변경자</th><th>대상 업무</th><th>변경 내용</th><th>사유</th></tr></thead>
       <tbody id="histRows"></tbody></table></div>
   </section>
 </div>
@@ -1525,6 +1507,8 @@ async function persistStaffData(){
   if(!STAFF_DATA_READY){ STAFF_DATA_SAVE_QUEUED=true; return; }
   if(STAFF_DATA_SAVE_IN_FLIGHT){ STAFF_DATA_SAVE_QUEUED=true; return; }
   STAFF_DATA_SAVE_IN_FLIGHT=true;
+  /* 기존 저장자료에 남아 있는 선행업무 연결도 함께 정리해 저장합니다. */
+  TASKS.forEach(t=>{ t.prev=[]; });
   const snapshot={TASKS, FLOWS, HISTORY, MEMOS, seq, flowSeq, memoSeq, replySeq};
   const nextRaw=JSON.stringify(snapshot);
   try{
@@ -1593,7 +1577,7 @@ function applyPublicMeta(metaMap){
   if(metaMap.public_task_events){ try{ PUBLIC_TASK_EVENTS=JSON.parse(metaMap.public_task_events)||[]; }catch(_){ PUBLIC_TASK_EVENTS=[]; } }
 }
 function redrawCloudViews(){
-  drawKeywords(); drawExcludeKeywords(); drawImportedList(); drawMemos(); drawImpactSel(); drawNoticeSettings();
+  drawKeywords(); drawExcludeKeywords(); drawImportedList(); drawMemos(); drawNoticeSettings();
   if(mode==='student') drawStudent(); else if(mode==='staff' && hasStaffSession()) drawStaff();
 }
 async function initPublicCloudSync(){
@@ -1648,7 +1632,10 @@ async function initStaffCloudSync(){
       try{
         const snap=JSON.parse(metaMap.staff_data);
         if(snap && typeof snap==='object'){
-          if(Array.isArray(snap.TASKS)) TASKS=snap.TASKS;
+          if(Array.isArray(snap.TASKS)){
+            TASKS=snap.TASKS;
+            TASKS.forEach(t=>{ t.prev=[]; });
+          }
           if(Array.isArray(snap.FLOWS)){ FLOWS.length=0; FLOWS.push(...snap.FLOWS); }
           if(Array.isArray(snap.HISTORY)) HISTORY=snap.HISTORY;
           if(Array.isArray(snap.MEMOS)) MEMOS=snap.MEMOS;
@@ -1701,7 +1688,6 @@ function maskDateInput(raw){
   return digits.slice(0,4)+'-'+digits.slice(4,6)+'-'+digits.slice(6);
 }
 const fmt=iso=>iso?iso.slice(5).replace('-','.'):'-';
-const nextOf=id=>TASKS.filter(t=>t.prev.some(p=>p.id===id));
 const doneRate=t=>t.criteria.length?Math.round(t.criteria.filter(c=>c[1]).length/t.criteria.length*100):0;
 const stClass=s=>({'지연':'late','일정변경':'move','완료':'done','확인요청':'ask','진행중':'prog'}[s]||'');
 let toastTimer;
@@ -1765,7 +1751,7 @@ function renderCalendar(container,titleEl,y,m,events,clickable,addLabel){
 }
 
 /* ===== 직원용 ===== */
-let myDept='JH', deptFilter='JH', pending=null;
+let myDept='JH', deptFilter='JH';
 let calY=+TODAY.slice(0,4), calM=+TODAY.slice(5,7)-1;
 /* 드래그로 방금 잡아둔 임시 블록 — 확정 전까지 달력에 미리 표시됩니다 */
 let DRAFT=null;   // {start, end, name}
@@ -1797,8 +1783,7 @@ function drawStaffCal(){
     :'<p class="empty">예정된 업무가 없습니다.</p>';
 }
 /* ===== 업무 연결 지도 (편집 가능) =====
-   각 흐름은 카드 순서(f.order)를 직접 갖습니다. 끌어서 순서를 바꾸면
-   선행·후속 관계를 다시 이어주고, 그 결과가 일정 변경 영향 계산에 그대로 반영됩니다. */
+   각 흐름은 카드 순서(f.order)를 직접 갖습니다. 업무 일정은 서로 독립적으로 관리합니다. */
 let flowSeq=10;
 
 function syncOrder(){
@@ -1810,23 +1795,7 @@ function syncOrder(){
     ids.forEach(id=>{ if(!f.order.includes(id)) f.order.push(id); });
   });
 }
-/* 순서가 바뀌면 바로 앞 카드와 이어주되, 여전히 앞쪽에 있는 기존 선행은 그대로 둡니다
-   (한 카드에 여러 선행이 걸린 구조를 망가뜨리지 않기 위해) */
-function relink(f){
-  f.order.forEach((id,i)=>{
-    const t=byId(id); if(!t) return;
-    const keep=t.prev.filter(p=>{
-      const idx=f.order.indexOf(p.id);
-      return idx===-1 ? true : idx<i;
-    });
-    if(i>0){
-      const prevId=f.order[i-1];
-      if(!keep.some(p=>p.id===prevId)) keep.push({id:prevId, lead:3});
-    }
-    t.prev=keep;
-  });
-}
-function afterMapEdit(){ syncOrder(); drawFlows(); drawStaffCal(); drawDeptRows(); drawImpactSel(); }
+function afterMapEdit(){ syncOrder(); drawFlows(); drawStaffCal(); drawDeptRows(); }
 
 function drawFlows(){
   syncOrder();
@@ -1834,14 +1803,7 @@ function drawFlows(){
     const chain=f.order.map(id=>byId(id)).filter(Boolean);
     const nodes=chain.map((t,i)=>{
       const moved=t.date!==t.baseDate;
-      let arrow='';
-      if(i>0){
-        const link=t.prev.find(p=>p.id===chain[i-1].id);
-        arrow=`<div class="arrow editable"><div class="ln"></div><div class="hd"></div>
-          <div class="leadwrap">+<input class="lead-in" type="number" min="0" max="180"
-            value="${link?link.lead:3}" data-lead="${t.id}" data-leadprev="${chain[i-1].id}">일</div></div>`;
-      }
-      return arrow+`<div class="node edit ${stClass(t.status)}" draggable="true" data-card="${t.id}" data-flow="${f.id}">
+       return `<div class="node edit ${stClass(t.status)}" draggable="true" data-card="${t.id}" data-flow="${f.id}">
         <div class="nd-top">
           <span class="nd-grip" title="끌어서 순서 변경">⣿</span>
           <select class="nd-dept" data-setdept="${t.id}">
@@ -1907,8 +1869,8 @@ function addCardToFlow(flowId){
   const lastId=f.order[f.order.length-1], last=lastId?byId(lastId):null;
   const date=last? addDays(last.end||last.date, 3) : TODAY;
   const t=addTask({name:'새 업무', dept:myDept, owner:'미지정', date, end:date,
-    flow:flowId, prev:null, files:[], criteria:[]});
-  if(!f.order.includes(t.id)) f.order.push(t.id); relink(f); afterMapEdit();
+    flow:flowId, prev:[], files:[], criteria:[]});
+   if(!f.order.includes(t.id)) f.order.push(t.id); afterMapEdit();
   const el=document.querySelector(`[data-editname="${t.id}"]`);
   if(el){ el.focus(); const r=document.createRange(); r.selectNodeContents(el);
     const s=window.getSelection(); s.removeAllRanges(); s.addRange(r); }
@@ -1917,8 +1879,8 @@ function addCardToFlow(flowId){
 function deleteCard(id){
   const t=byId(id); if(!t) return;
   TASKS=TASKS.filter(x=>x.id!==id);
-  TASKS.forEach(x=>{ x.prev=x.prev.filter(p=>p.id!==id); });
-  FLOWS.forEach(f=>{ f.order=(f.order||[]).filter(x=>x!==id); relink(f); });
+  TASKS.forEach(x=>{ x.prev=(x.prev||[]).filter(p=>p.id!==id); });
+  FLOWS.forEach(f=>{ f.order=(f.order||[]).filter(x=>x!==id); });
   afterMapEdit(); scheduleStaffSave(true); toast(`"${t.name}" 카드를 삭제했습니다.`);
 }
 function addFlow(){
@@ -1935,35 +1897,8 @@ function deleteFlow(id){
   if(f.order.length){ toast('카드를 모두 지운 뒤 흐름을 삭제할 수 있습니다.'); return; }
   const i=FLOWS.findIndex(x=>x.id===id); FLOWS.splice(i,1); drawFlows(); scheduleStaffSave(true);
 }
-/* 선행 완료 후 필요일수를 지키도록 날짜를 뒤로만 밀어 정렬 */
-function fitConnectedDates(skipId){
-  let moved=0;
-  for(let pass=0; pass<TASKS.length; pass++){
-    let changed=false;
-    TASKS.forEach(t=>{
-      if(t.id===skipId) return;
-      if(!t.prev.length) return;
-      let earliest=null;
-      t.prev.forEach(p=>{ const pt=byId(p.id); if(!pt)return;
-        const c=addDays(pt.end||pt.date, p.lead); if(earliest===null||c>earliest) earliest=c; });
-      if(earliest && earliest>t.date){
-        const span=t.end?diffDays(t.date,t.end):0;
-        t.date=earliest; if(span>0) t.end=addDays(earliest,span);
-        changed=true; moved++;
-      }
-    });
-    if(!changed) break;
-  }
-  return moved;
-}
-function autoFit(){
-  const moved=fitConnectedDates();
-  afterMapEdit();
-  toast(moved? `${moved}건의 일정을 뒤로 조정했습니다.` : '조정할 일정이 없습니다.');
-}
-
 /* 직원용 업무 캘린더에서 막대를 끌어 옮겼을 때의 확정 처리입니다.
-   기간 업무는 기간 길이를 유지하고, 후속 업무만 필요한 범위에서 뒤로 조정합니다. */
+   기간 업무는 기간 길이를 유지합니다. */
 function moveTaskFromStaffCalendar(taskId,newDate){
   const t=byId(taskId); if(!t||!isValidISODate(newDate)||t.date===newDate) return;
   const oldDate=t.date, oldEnd=t.end;
@@ -1971,22 +1906,13 @@ function moveTaskFromStaffCalendar(taskId,newDate){
   t.date=newDate;
   if(span>0) t.end=addDays(newDate,span);
   if(t.status!=='완료') t.status='일정변경';
-  const before=new Map(TASKS.map(x=>[x.id,{date:x.date,end:x.end||x.date}]));
-  const moved=fitConnectedDates(taskId);
-  const affected=TASKS.filter(x=>{
-    if(x.id===taskId) return false;
-    const b=before.get(x.id);
-    return b&&(b.date!==x.date||b.end!==(x.end||x.date));
-  });
-  affected.forEach(x=>{ if(x.status==='예정') x.status='일정변경'; });
   const oldLabel=oldEnd&&oldEnd!==oldDate?`${oldDate} ~ ${oldEnd}`:oldDate;
   const newLabel=t.end&&t.end!==t.date?`${t.date} ~ ${t.end}`:t.date;
   HISTORY.unshift({at:nowKSTMinute(),who:dept(myDept).name+' 담당자',
     task:t.id,what:`달력에서 일정 이동 ${oldLabel} → ${newLabel}`,
-    why:'직원용 업무 캘린더에서 끌어 이동',
-    affect:affected.length===1?affected[0].name:(affected.length?`${affected[0].name} 외 ${affected.length-1}건`:'-')});
+    why:'직원용 업무 캘린더에서 끌어 이동'});
   afterMapEdit(); drawHist(); scheduleStaffSave(true);
-  toast(`${t.name} 일정을 ${newDate}(으)로 옮겼습니다.${moved?` 후속 ${moved}건도 조정했습니다.`:''}`);
+  toast(`${t.name} 일정을 ${newDate}(으)로 옮겼습니다.`);
 }
 
 /* ── 드래그로 카드 순서 바꾸기 ── */
@@ -2027,8 +1953,8 @@ document.addEventListener('drop', e=>{
   let to=f.order.indexOf(card.dataset.card);
   if(to===-1) to=f.order.length; else if(!before) to+=1;
   f.order.splice(to,0,dragCardId);
-  relink(f); afterMapEdit();
-  toast('순서를 바꾸고 선행·후속 관계를 다시 이었습니다.');
+  afterMapEdit();
+  toast('업무 흐름 순서를 바꿨습니다.');
   })(e);
   scheduleStaffSave();
 });
@@ -2039,80 +1965,18 @@ function drawDeptRows(){
   const rows=TASKS.filter(t=>t.dept===deptFilter);
   const cnt=$('#deptCount'); if(cnt) cnt.textContent=`${dept(deptFilter).name} · ${rows.length}건`;
   $('#deptRows').innerHTML=rows.length?rows.map(t=>{
-    const pv=t.prev.length?t.prev.map(p=>{const pt=byId(p.id);return pt?esc(pt.name)+(pt.status!=='완료'?' <span style="color:var(--s-ask)">(미완료)</span>':''):''}).join('<br>')
-      :'<span style="color:var(--ink-3)">없음</span>';
     const span=t.end&&t.end!==t.date;
     return `<tr><td><button class="link" data-task="${t.id}" style="border:0;background:none;padding:0;font-weight:700;color:var(--brand)">${esc(t.name)}</button></td>
       <td>${esc(t.owner)}</td>
       <td class="num">${span?`${t.date}<br>~ ${t.end}`:t.date}${t.date!==t.baseDate?`<br><s style="color:var(--ink-3)">${t.baseDate}</s>`:''}</td>
-      <td><span class="st st-${t.status}">${t.status}</span></td><td>${pv}</td><td class="num">${doneRate(t)}%</td>
+      <td><span class="st st-${t.status}">${t.status}</span></td><td class="num">${doneRate(t)}%</td>
       <td><button class="pubchip ${t.isPublic?'on':''}" data-pubtoggle="${t.id}">${t.isPublic?'공개 중':'비공개'}</button></td>
       <td><button class="nd-del" data-delcard="${t.id}" title="삭제">✕</button></td></tr>`;
-  }).join(''):'<tr><td colspan="8" class="empty">해당 부서의 업무가 없습니다. 위의 「+ 업무 추가」로 만들어보세요.</td></tr>';
+  }).join(''):'<tr><td colspan="7" class="empty">해당 부서의 업무가 없습니다. 위의 「+ 업무 추가」로 만들어보세요.</td></tr>';
 }
 function drawHist(){
   $('#histRows').innerHTML=HISTORY.map(h=>{const t=byId(h.task);
     return `<tr><td class="num">${esc(h.at)}</td><td>${esc(h.who)}</td><td>${esc(t?t.name:h.task)}</td>
-      <td>${esc(h.what)}</td><td>${esc(h.why)}</td><td>${esc(h.affect)}</td></tr>`}).join('');
-}
-function drawImpactSel(){
-  const cur=$('#impTask').value;
-  $('#impTask').innerHTML=FLOWS.map(f=>`<optgroup label="${esc(f.name)}">`+
-    TASKS.filter(t=>t.flow===f.id).map(t=>`<option value="${t.id}">${esc(t.name)} (${t.date})</option>`).join('')+`</optgroup>`).join('');
-  if(cur&&byId(cur))$('#impTask').value=cur;
-  syncImpDate();
-}
-function syncImpDate(){const t=byId($('#impTask').value); if(t)$('#impDate').value=t.date; $('#impApply').disabled=true; pending=null}
-function simulate(taskId,newDate){
-  const plan={}; TASKS.forEach(t=>plan[t.id]=t.date); plan[taskId]=newDate;
-  for(let p=0;p<TASKS.length;p++){
-    let moved=false;
-    TASKS.forEach(t=>{
-      if(t.id===taskId||!t.prev.length)return;
-      let e=null;
-      t.prev.forEach(pr=>{if(!plan[pr.id])return; const c=addDays(plan[pr.id],pr.lead); if(e===null||c>e)e=c});
-      if(e&&e>plan[t.id]){plan[t.id]=e;moved=true}
-    });
-    if(!moved)break;
-  }
-  const changed=[];
-  TASKS.forEach(t=>{if(t.id!==taskId&&plan[t.id]!==t.date)
-    changed.push({id:t.id,from:t.date,to:plan[t.id],delta:diffDays(t.date,plan[t.id])})});
-  return {changed};
-}
-function showImpact(){
-  const id=$('#impTask').value,nd=$('#impDate').value,t=byId(id);
-  if(!t||!nd){toast('업무와 날짜를 선택해주세요.');return}
-  const delta=diffDays(t.date,nd);
-  if(delta===0){$('#impResult').innerHTML='<p class="empty">예정일이 기존과 같습니다.</p>';$('#impApply').disabled=true;pending=null;return}
-  const {changed}=simulate(id,nd);
-  const ds=[...new Set(changed.map(c=>byId(c.id).dept))].map(d=>dept(d).name);
-  $('#impResult').innerHTML=`
-    <div class="impact-head"><span class="st st-일정변경">일정 변경</span>
-      <span>${esc(t.name)} · ${t.date} → <b style="color:var(--s-move)">${nd}</b> (${delta>0?'+':''}${delta}일)</span></div>
-    ${changed.length?`<p style="font-size:12.5px;color:var(--ink-2);margin:0 0 10px">
-      후속 업무 <b>${changed.length}건</b>, 관련 부서 <b>${ds.join(' · ')}</b>에 영향이 있습니다.</p>
-      ${changed.map(c=>{const ct=byId(c.id);return `<div class="imp shift"><span class="nm">${esc(ct.name)}</span>
-        <span style="font-size:11.5px;color:var(--ink-3)">${esc(dept(ct.dept).name)} · ${esc(ct.owner)}</span>
-        <span class="dates"><s>${c.from}</s> → <b>${c.to}</b></span>
-        <span class="delta">+${c.delta}일</span></div>`}).join('')}`
-    :`<div class="imp safe"><span class="nm">후속 업무 일정에는 영향이 없습니다.</span>
-       <span class="delta none">여유 있음</span></div>`}
-    <p style="font-size:11.5px;color:var(--ink-3);margin:12px 0 0">
-      자동으로 확정되지 않습니다. 내용을 확인한 뒤 <b>변경 반영</b>을 눌러야 저장됩니다.</p>`;
-  pending={id,nd,changed,why:$('#impWhy').value.trim()}; $('#impApply').disabled=false;
-}
-function applyImpact(){
-  if(!pending)return;
-  const t=byId(pending.id),old=t.date;
-  t.date=pending.nd; if(t.status!=='완료')t.status='일정변경';
-  pending.changed.forEach(c=>{const ct=byId(c.id);ct.date=c.to;if(ct.status==='예정')ct.status='일정변경'});
-  HISTORY.unshift({at:nowKSTMinute(),who:dept(myDept).name+' 담당자',
-    task:t.id,what:`예정일 ${old} → ${t.date}`,why:pending.why||'사유 미입력',
-    affect:pending.changed.length?`${byId(pending.changed[0].id).name} 외 ${pending.changed.length-1}건`:'-'});
-  toast(`${t.name} 일정을 반영했습니다. 후속 ${pending.changed.length}건 조정됨`);
-  pending=null;$('#impApply').disabled=true; drawStaff(); drawImpactSel();
-  $('#impResult').innerHTML='<p class="empty">반영이 완료되었습니다. 변경 이력에서 확인할 수 있습니다.</p>';
 }
 function drawStaff(){drawStaffCal();drawFlows();drawDeptRows();drawHist()}
 
@@ -2196,7 +2060,7 @@ function saveQuick(){
   $('#quickpop').hidden=true;
   if(!FLOWS.length){ FLOWS.push({id:'FN'+(flowSeq++), name:'새 업무 흐름', note:'', order:[]}); }
   const t=addTask({name, dept:deptV, owner:'미지정', date:start, end, flow:FLOWS[0].id,
-    prev:null, files:[], criteria:[]});
+    files:[], criteria:[]});
   const f=FLOWS.find(x=>x.id===t.flow);
   if(f){ if(!f.order) f.order=[]; if(!f.order.includes(t.id)) f.order.push(t.id); }
   syncOrder(); drawFlows(); drawDeptRows();
@@ -2204,21 +2068,20 @@ function saveQuick(){
   toast(`"${name}" 업무를 추가했습니다. 부서별 업무·연결 지도에도 함께 등록됩니다.`);
 }
 
-function addTask({name,dept,owner,date,end,flow,prev,files,criteria}){
+function addTask({name,dept,owner,date,end,flow,files,criteria}){
   const t={id:'N'+(seq++), flow, name, dept, owner:owner||'미지정', date,
     end: end&&end!==date?end:undefined, baseDate:date, status:'예정',
-    prev:prev&&prev.id?[{id:prev.id,lead:prev.lead}]:[],
+    prev:[],
     files:files&&files.length?files:['(미등록)'],
     criteria:criteria&&criteria.length?criteria:[['완료 확인',false]], note:''};
   TASKS.push(t);
   HISTORY.unshift({at:nowKSTMinute(),who:dept?DEPTS.find(d=>d.id===dept).name+' 담당자':'담당자',
-    task:t.id, what:`업무 신규 등록 (${date}${t.end?' ~ '+t.end:''})`, why:'담당자 직접 추가',
-    affect:t.prev.length?`선행: ${byId(t.prev[0].id).name}`:'-'});
-  drawStaff(); drawImpactSel();
+    task:t.id, what:`업무 신규 등록 (${date}${t.end?' ~ '+t.end:''})`, why:'담당자 직접 추가'});
+  drawStaff();
   return t;
 }
 
-/* "옵션 더보기" — 빠른 추가에 입력한 값을 이어받아 상세 항목(선행 업무·완료 기준 등)까지 입력하는 서랍 */
+/* "옵션 더보기" — 빠른 추가에 입력한 값을 이어받아 상세 항목까지 입력하는 서랍 */
 function openNewFull(opts){
   if(!FLOWS.length){ FLOWS.push({id:'FN'+(flowSeq++), name:'새 업무 흐름', note:'', order:[]}); }
   const o=opts||{};
@@ -2242,13 +2105,6 @@ function openNewFull(opts){
     </div>
     <div class="field"><label for="nfFlow">속한 흐름</label>
       <select id="nfFlow">${FLOWS.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select></div>
-    <div class="row2">
-      <div class="field"><label for="nfPrev">선행 업무 (선택)</label>
-        <select id="nfPrev"><option value="">없음</option>${TASKS.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div>
-      <div class="field"><label for="nfLead">선행 완료 후 필요일수</label>
-        <input type="number" id="nfLead" value="3" min="0" max="120">
-        <div class="hintline">선행이 밀리면 이 일수만큼 뒤로 밀립니다.</div></div>
-    </div>
     <div class="field"><label for="nfCri">완료 기준</label>
       <textarea id="nfCri" placeholder="한 줄에 하나씩 적어주세요&#10;예)&#10;대상자 명단 확정&#10;재무팀 전달자료 생성&#10;전달 일시 기록"></textarea></div>
     <div class="field"><label for="nfFiles">전달자료 (쉼표로 구분)</label>
@@ -2283,12 +2139,11 @@ function openNewFull(opts){
 function saveNewFull(){
   const name=$('#nfName').value.trim();
   if(!name){toast('업무명을 입력해주세요.');$('#nfName').focus();return}
-  const prevId=$('#nfPrev').value;
   const cri=$('#nfCri').value.split('\n').map(s=>s.trim()).filter(Boolean).map(s=>[s,false]);
   const files=$('#nfFiles').value.split(',').map(s=>s.trim()).filter(Boolean);
   const date=$('#nfDate').value, end=$('#nfEnd').value||date;
   const t=addTask({name, dept:$('#nfDept').value, owner:$('#nfOwner').value.trim(), date, end,
-    flow:$('#nfFlow').value, prev:prevId?{id:prevId,lead:Math.max(0,+$('#nfLead').value||0)}:null,
+    flow:$('#nfFlow').value,
     files, criteria:cri});
   const pubOn=$('#nfPubOn'), isPub=!!(pubOn&&pubOn.checked);
   if(isPub){
@@ -2598,16 +2453,6 @@ function drawStudent(){
 /* ===== 서랍 ===== */
 function openTask(id){
   const t=byId(id); if(!t)return;
-  const pv=t.prev.length?t.prev.map(p=>{const pt=byId(p.id); if(!pt)return '';
-    return `<button class="link" data-task="${p.id}"><span class="st st-${pt.status}">${pt.status}</span>
-      <span style="flex:1">${esc(pt.name)}</span>
-      <span style="color:var(--ink-3);font-size:11.5px">완료 +${p.lead}일</span></button>`}).join('')
-    :'<p style="color:var(--ink-3);font-size:12.5px;margin:0">선행 업무가 없습니다.</p>';
-  const nx=nextOf(id);
-  const nh=nx.length?nx.map(n=>`<button class="link" data-task="${n.id}">
-      <span class="st st-${n.status}">${n.status}</span><span style="flex:1">${esc(n.name)}</span>
-      <span style="color:var(--ink-3);font-size:11.5px">${esc(dept(n.dept).name)}</span></button>`).join('')
-    :'<p style="color:var(--ink-3);font-size:12.5px;margin:0">후속 업무가 없습니다.</p>';
   const rate=doneRate(t);
   $('#drawer').innerHTML=`
     <div class="dr-top"><h2>${esc(t.name)}</h2><button class="x" id="drClose" aria-label="닫기">✕</button></div>
@@ -2641,8 +2486,6 @@ function openTask(id){
       ${t.criteria.map((c,i)=>`<label class="chk ${c[1]?'on':''}">
         <input type="checkbox" data-chk="${i}" ${c[1]?'checked':''}><span>${esc(c[0])}</span></label>`).join('')}</div>
     <div class="dr-sec"><h4>전달자료</h4>${t.files.map(f=>`<span class="tag">${esc(f)}</span>`).join('')}</div>
-    <div class="dr-sec"><h4>선행 업무</h4><div class="link-list">${pv}</div></div>
-    <div class="dr-sec"><h4>후속 업무</h4><div class="link-list">${nh}</div></div>
     <div class="dr-sec">
       <h4>학생 공개</h4>
       <label class="switch">
@@ -2669,7 +2512,7 @@ function openTask(id){
       <div class="field"><select id="stSel">${STATUS.map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('')}</select></div>
       <button class="btn btn-sm" id="stSave" data-task="${t.id}">상태 저장</button></div>
     <div class="dr-sec"><h4>업무 삭제</h4>
-      <p style="color:var(--ink-3);font-size:12px;margin:0 0 10px">삭제하면 이 업무와 연결된 선행·후속 관계도 함께 정리됩니다.</p>
+      <p style="color:var(--ink-3);font-size:12px;margin:0 0 10px">삭제하면 이 업무가 업무 캘린더와 업무 흐름에서 함께 사라집니다.</p>
       <button class="btn ghost danger btn-sm" data-deltask="${t.id}">이 업무 삭제</button></div>`;
   $('#drawer').hidden=false;$('#scrim').hidden=false;$('#drawer').dataset.task=id;$('#drClose').focus();
 }
@@ -2691,7 +2534,7 @@ function closeDrawer(){$('#drawer').hidden=true;$('#scrim').hidden=true}
 
 /* ===== 산출물 내보내기 — 「업무별 표준기준표」(11월 산출물) ===== */
 function buildCsv(){
-  const head=['흐름','업무명','담당 부서','담당자','시작일','종료일','상태','선행 업무','필요일수(일)','완료 기준','전달자료','학생 공개'];
+  const head=['흐름','업무명','담당 부서','담당자','시작일','종료일','상태','완료 기준','전달자료','학생 공개'];
   const rows=[head];
   syncOrder();
   FLOWS.forEach(f=>{
@@ -2699,8 +2542,6 @@ function buildCsv(){
       const t=byId(id); if(!t) return;
       rows.push([
         f.name, t.name, dept(t.dept).name, t.owner, t.date, t.end||t.date, t.status,
-        t.prev.map(p=>(byId(p.id)||{}).name||'').filter(Boolean).join(' / '),
-        t.prev.map(p=>p.lead).join(' / '),
         t.criteria.map(c=>(c[1]?'[완료] ':'')+c[0]).join(' / '),
         (t.files||[]).join(' / '),
         t.isPublic?'공개':''
@@ -3115,7 +2956,7 @@ async function getActiveStaffMember(){
 }
 
 const TABS={
-  staff:[['s-cal','업무 캘린더'],['s-dept','부서별 업무'],['s-map','업무 연결 지도'],['s-impact','일정 변경 영향'],['s-hist','변경 이력'],['s-import','(학생용 캘린더) 지급일 업로드']],
+  staff:[['s-cal','업무 캘린더'],['s-dept','부서별 업무'],['s-map','업무 연결 지도'],['s-hist','변경 이력'],['s-import','(학생용 캘린더) 지급일 업로드']],
   student:[['t-cal','장학금 일정'],['t-list','전체보기']]
 };
 /* 업무 캘린더와 부서별 업무는 같은 데이터를 쓰므로 한 묶음으로 보여줍니다 */
@@ -3135,7 +2976,7 @@ function tabsHtml(m, activeId){
        + t.slice(2,-1).map(btn).join('')
        + `<span class="tabspacer"></span>` + `<span class="tab-right">${btn(last)}</span>`;
 }
-const NOTE={staff:'부서 간 업무 연결과 일정 변경 영향을 확인하는 화면입니다.',
+const NOTE={staff:'부서 간 업무 흐름과 일정을 확인하는 화면입니다.',
             student:'장학금 신청 기간과 지급 예정일을 확인하는 화면입니다.'};
 let mode='staff';
 function setMode(m){
@@ -3234,7 +3075,6 @@ document.addEventListener('click',e=>{
   const df=e.target.closest('[data-delflow]'); if(df){deleteFlow(df.dataset.delflow);return}
   const oc=e.target.closest('[data-opencard]'); if(oc){openTask(oc.dataset.opencard);return}
   if(e.target.id==='addFlowBtn'){addFlow();return}
-  if(e.target.id==='autoFitBtn'){autoFit();return}
   if(e.target.id==='addDeptTaskBtn'){
     openNewFull({name:'', start:TODAY, end:TODAY, dept:deptFilter}); return;
   }
@@ -3385,9 +3225,6 @@ $('#todayBtn').onclick=()=>{calY=+TODAY.slice(0,4);calM=+TODAY.slice(5,7)-1;draw
 $('#sPrevM').onclick=()=>shiftMonth('student',-1);
 $('#sNextM').onclick=()=>shiftMonth('student',1);
 $('#sTodayBtn').onclick=()=>{sCalY=+TODAY.slice(0,4);sCalM=+TODAY.slice(5,7)-1;drawStudent()};
-$('#impTask').addEventListener('change',syncImpDate);
-$('#impCalc').addEventListener('click',showImpact);
-$('#impApply').addEventListener('click',e=>{ applyImpact(e); scheduleStaffSave(); });
 
 /* 업무 연결 지도 카드 날짜칸: 타이핑하는 대로 YYYY-MM-DD 형태를 유지시켜줌 */
 document.addEventListener('input', e=>{
@@ -3411,10 +3248,6 @@ document.addEventListener('change', e=>{
         who:dept(myDept).name+' 담당자',task:t.id,what:`상태 ${t.status} → ${st.value}`,
         why:'연결 지도에서 변경',affect:'-'});
       t.status=st.value; afterMapEdit(); } return; }
-  const ld=e.target.closest('[data-lead]');
-  if(ld){ const t=byId(ld.dataset.lead);
-    if(t){ const link=t.prev.find(p=>p.id===ld.dataset.leadprev);
-      if(link){ link.lead=Math.max(0,+ld.value||0); afterMapEdit(); } } return; }
   if(e.target.id==='fileInput'){
     const f=e.target.files&&e.target.files[0];
     if(f){ $('#fileName').textContent=f.name; readSheet(f); }
@@ -3455,7 +3288,7 @@ document.addEventListener('blur', e=>{
     return; }
   const ef=e.target.closest && e.target.closest('[data-editflow]');
   if(ef){ const f=FLOWS.find(x=>x.id===ef.dataset.editflow);
-    if(f){ const v=ef.textContent.trim(); if(v) f.name=v; else ef.textContent=f.name; drawImpactSel(); }
+    if(f){ const v=ef.textContent.trim(); if(v) f.name=v; else ef.textContent=f.name; }
     return; }
   const efn=e.target.closest && e.target.closest('[data-editflownote]');
   if(efn){ const f=FLOWS.find(x=>x.id===efn.dataset.editflownote);
@@ -3546,7 +3379,7 @@ $('#calShowPub').addEventListener('change', e=>{
 });
 $('#noticeSave').addEventListener('click', saveNoticeCfg);
 $('#noticeHistLoad').addEventListener('click', loadNoticeHistSelected);
-drawDeptChips(); drawImpactSel(); drawMemos(); drawKeywords(); drawNoticeSettings(); setMode('student');
+drawDeptChips(); drawMemos(); drawKeywords(); drawNoticeSettings(); setMode('student');
 initPublicCloudSync();
 restoreStaffSession();
 

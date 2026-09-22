@@ -1589,11 +1589,10 @@ function drawFlows(){
         <div class="nd-row">
           <input type="text" inputmode="numeric" class="nd-date" value="${t.date}" data-setdate="${t.id}" maxlength="10" placeholder="YYYY-MM-DD">
         </div>
-        ${t.end && t.end!==t.date ? `<div class="nd-endrow">
+        <div class="nd-endrow">
           <span class="nd-tilde">~</span>
-          <input type="text" inputmode="numeric" class="nd-date" value="${t.end}" data-setend="${t.id}" maxlength="10" placeholder="YYYY-MM-DD">
-          <button class="nd-endx" data-delend="${t.id}" title="종료일 삭제">✕</button>
-        </div>` : `<button type="button" class="nd-addend" data-addend="${t.id}">+ 종료일(기간으로 표시)</button>`}
+          <input type="text" inputmode="numeric" class="nd-date" value="${t.end && t.end!==t.date ? t.end : ''}" data-setend="${t.id}" maxlength="10" placeholder="종료일(선택)">
+        </div>
         <div class="nd-row" style="margin-top:5px">
           <select class="nd-st" data-setst="${t.id}">
             ${STATUS.map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('')}
@@ -2792,12 +2791,6 @@ document.addEventListener('click',e=>{
   const dt2=e.target.closest('[data-deltask]'); if(dt2){deleteCard(dt2.dataset.deltask);closeDrawer();return}
   const df=e.target.closest('[data-delflow]'); if(df){deleteFlow(df.dataset.delflow);return}
   const oc=e.target.closest('[data-opencard]'); if(oc){openTask(oc.dataset.opencard);return}
-  const ae=e.target.closest('[data-addend]');
-  if(ae){ const t=byId(ae.dataset.addend); if(t){ t.end=addDays(t.date,1); afterMapEdit();
-      const el=document.querySelector(`[data-setend="${t.id}"]`); if(el){ el.focus(); el.select(); } }
-    return; }
-  const de2=e.target.closest('[data-delend]');
-  if(de2){ const t=byId(de2.dataset.delend); if(t){ t.end=undefined; afterMapEdit(); } return; }
   if(e.target.id==='addFlowBtn'){addFlow();return}
   if(e.target.id==='autoFitBtn'){autoFit();return}
   if(e.target.id==='addDeptTaskBtn'){

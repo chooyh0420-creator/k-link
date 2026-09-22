@@ -1514,10 +1514,11 @@ async function persistStaffData(){
   STAFF_DATA_SAVE_IN_FLIGHT=true;
   const snapshot={TASKS, FLOWS, HISTORY, MEMOS, seq, flowSeq, memoSeq, replySeq};
   const nextRaw=JSON.stringify(snapshot);
-  let claimed=null;
   try{
-    claimed=await acquireStaffVersionLock();
-    if(!claimed) return;
+    /* 저장 직전에 현재 원문을 다시 읽어 다른 탭의 변경을 보호합니다.
+       버전 행을 조건부 UPDATE로 잠그는 방식은 Supabase 반환/RLS 조합에 따라
+       정상 UPDATE도 빈 결과로 보일 수 있어, 업무자료 저장을 오판해 버리는
+       원인이 됩니다. 최신 원문 비교가 실제 덮어쓰기 방지의 기준입니다. */
     const latest=await sb.from('klink_meta').select('value').eq('key','staff_data').maybeSingle();
     if(latest.error) throw latest.error;
     const latestRaw=latest.data?latest.data.value:null;
@@ -1540,7 +1541,6 @@ async function persistStaffData(){
     console.warn('클라우드 저장 실패(업무자료):', err);
     toast('업무자료 저장에 실패했습니다. 인터넷 연결을 확인해주세요.');
   }finally{
-    await releaseStaffVersionLock(claimed);
     STAFF_DATA_SAVE_IN_FLIGHT=false;
     if(STAFF_DATA_SAVE_QUEUED && !STAFF_DATA_CONFLICT){
       STAFF_DATA_SAVE_QUEUED=false;

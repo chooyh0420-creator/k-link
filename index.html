@@ -408,6 +408,7 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .wk-grid button.off{background:var(--surface-2)}
 .wk-grid button.istoday{background:var(--brand-soft)}
 .wk-grid button:hover{background:color-mix(in srgb, var(--brand) 8%, transparent)}
+.wk-grid button.drop-target{background:color-mix(in srgb, var(--brand) 18%, transparent); box-shadow:inset 0 0 0 2px var(--brand)}
 .wk-grid button.sel{background:color-mix(in srgb, var(--brand) 16%, transparent)}
 .wk-grid button.sel::after{display:none}
 .wk-grid button:hover::after{content:attr(data-addlabel); position:absolute; left:7px; bottom:7px;
@@ -427,6 +428,9 @@ main{padding:20px; max-width:1540px; margin:0 auto}
   padding:3px 9px; border-radius:4px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
   margin:0 1px; color:#fff}
 .bar:hover{filter:brightness(1.13)}
+.bar[data-kindev="task"]{cursor:grab; touch-action:none}
+.bar[data-kindev="task"]:active,.bar.dragging-event{cursor:grabbing}
+.bar.dragging-event{opacity:.48; filter:saturate(.75)}
 .bar:focus-visible{outline:2px solid var(--ink); outline-offset:1px}
 .bar.mid{border-radius:0} .bar.start{border-radius:4px 0 0 4px} .bar.end{border-radius:0 4px 4px 0}
 .bar .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.88);margin-right:6px;vertical-align:1.5px}
@@ -1847,11 +1851,12 @@ function deleteFlow(id){
   const i=FLOWS.findIndex(x=>x.id===id); FLOWS.splice(i,1); drawFlows();
 }
 /* 선행 완료 후 필요일수를 지키도록 날짜를 뒤로만 밀어 정렬 */
-function autoFit(){
+function fitConnectedDates(skipId){
   let moved=0;
   for(let pass=0; pass<TASKS.length; pass++){
     let changed=false;
     TASKS.forEach(t=>{
+      if(t.id===skipId) return;
       if(!t.prev.length) return;
       let earliest=null;
       t.prev.forEach(p=>{ const pt=byId(p.id); if(!pt)return;
@@ -1864,8 +1869,39 @@ function autoFit(){
     });
     if(!changed) break;
   }
+  return moved;
+}
+function autoFit(){
+  const moved=fitConnectedDates();
   afterMapEdit();
   toast(moved? `${moved}건의 일정을 뒤로 조정했습니다.` : '조정할 일정이 없습니다.');
+}
+
+/* 직원용 업무 캘린더에서 막대를 끌어 옮겼을 때의 확정 처리입니다.
+   기간 업무는 기간 길이를 유지하고, 후속 업무만 필요한 범위에서 뒤로 조정합니다. */
+function moveTaskFromStaffCalendar(taskId,newDate){
+  const t=byId(taskId); if(!t||!isValidISODate(newDate)||t.date===newDate) return;
+  const oldDate=t.date, oldEnd=t.end;
+  const span=t.end&&t.end!==t.date?diffDays(t.date,t.end):0;
+  t.date=newDate;
+  if(span>0) t.end=addDays(newDate,span);
+  if(t.status!=='완료') t.status='일정변경';
+  const before=new Map(TASKS.map(x=>[x.id,{date:x.date,end:x.end||x.date}]));
+  const moved=fitConnectedDates(taskId);
+  const affected=TASKS.filter(x=>{
+    if(x.id===taskId) return false;
+    const b=before.get(x.id);
+    return b&&(b.date!==x.date||b.end!==(x.end||x.date));
+  });
+  affected.forEach(x=>{ if(x.status==='예정') x.status='일정변경'; });
+  const oldLabel=oldEnd&&oldEnd!==oldDate?`${oldDate} ~ ${oldEnd}`:oldDate;
+  const newLabel=t.end&&t.end!==t.date?`${t.date} ~ ${t.end}`:t.date;
+  HISTORY.unshift({at:new Date().toISOString().slice(0,16).replace('T',' '),who:dept(myDept).name+' 담당자',
+    task:t.id,what:`달력에서 일정 이동 ${oldLabel} → ${newLabel}`,
+    why:'직원용 업무 캘린더에서 끌어 이동',
+    affect:affected.length===1?affected[0].name:(affected.length?`${affected[0].name} 외 ${affected.length-1}건`:'-')});
+  afterMapEdit(); drawHist(); scheduleStaffSave();
+  toast(`${t.name} 일정을 ${newDate}(으)로 옮겼습니다.${moved?` 후속 ${moved}건도 조정했습니다.`:''}`);
 }
 
 /* ── 드래그로 카드 순서 바꾸기 ── */
@@ -2252,8 +2288,10 @@ function saveReply(memoId){
 let justDragged=false;
 
 function cellAtPoint(x,y){
-  const el=document.elementFromPoint(x,y);
-  return el?el.closest('[data-newday]'):null;
+  const els=document.elementsFromPoint
+    ? document.elementsFromPoint(x,y)
+    : [document.elementFromPoint(x,y)];
+  return els.map(el=>el&&el.closest('[data-newday]')).find(Boolean)||null;
 }
 function attachDrag(container, onRange){
   let s=null, e2=null, on=false;
@@ -2292,6 +2330,56 @@ function attachDrag(container, onRange){
   document.addEventListener('pointerup', ev=>{ if(on) end(ev); });
 }
 
+/* 기존 업무 막대는 날짜 칸 위에 떠 있으므로, 포인터 좌표 아래의 날짜 칸을 직접 찾아
+   끌어 놓는 방식으로 처리합니다. 일반 클릭은 기존처럼 상세 화면을 엽니다. */
+let ignoreCalendarTaskClick=false;
+function attachStaffTaskDrag(container){
+  let state=null;
+  const clear=()=>{
+    container.querySelectorAll('.drop-target').forEach(c=>c.classList.remove('drop-target'));
+    if(state&&state.bar) state.bar.classList.remove('dragging-event');
+  };
+  const suppressClick=()=>{
+    ignoreCalendarTaskClick=true;
+    setTimeout(()=>{ignoreCalendarTaskClick=false;},350);
+  };
+  const finish=(ev,cancelled)=>{
+    if(!state) return;
+    if(ev&&ev.pointerId!=null){ try{ container.releasePointerCapture(ev.pointerId); }catch(_){} }
+    const current=state;
+    clear(); state=null;
+    suppressClick();
+    if(cancelled) return;
+    if(current.moved && current.targetDate!==current.startDate){
+      moveTaskFromStaffCalendar(current.taskId,current.targetDate);
+    }else{
+      openTask(current.taskId);
+    }
+  };
+  container.addEventListener('pointerdown', ev=>{
+    if(ev.button!==0) return;
+    const bar=ev.target.closest('.bar[data-kindev="task"]'); if(!bar) return;
+    const task=byId(bar.dataset.ev2); if(!task) return;
+    ev.preventDefault(); closeQuickpop();
+    state={taskId:task.id,startDate:task.date,targetDate:task.date,moved:false,bar};
+    bar.classList.add('dragging-event');
+    try{ container.setPointerCapture(ev.pointerId); }catch(_){}
+  });
+  container.addEventListener('pointermove', ev=>{
+    if(!state) return;
+    const cell=cellAtPoint(ev.clientX,ev.clientY); if(!cell) return;
+    const target=cell.dataset.newday;
+    if(target===state.targetDate) return;
+    state.targetDate=target;
+    state.moved=target!==state.startDate;
+    container.querySelectorAll('.drop-target').forEach(c=>c.classList.remove('drop-target'));
+    if(state.moved) cell.classList.add('drop-target');
+  });
+  container.addEventListener('pointerup', ev=>finish(ev,false));
+  container.addEventListener('pointercancel', ev=>finish(ev,true));
+  document.addEventListener('pointerup', ev=>{ if(state) finish(ev,false); });
+}
+
 /* 직원용 달력 */
 attachDrag($('#calBody'), (a,b)=>{
   DRAFT={start:a, end:b, name:''};
@@ -2299,6 +2387,7 @@ attachDrag($('#calBody'), (a,b)=>{
   const anchor=anchorForDraft($('#calBody'),'__draft',a);
   if(anchor) openNewQuick(a,b,anchor);
 });
+attachStaffTaskDrag($('#calBody'));
 let sCalY=+TODAY.slice(0,4), sCalM=+TODAY.slice(5,7)-1, sFilter='all', sPastOpen=false;
 let sSeq=100;
 /* 직원용에서 '학생 공개'를 켠 업무를 학생 일정으로 변환합니다.
@@ -3036,6 +3125,7 @@ document.addEventListener('click',e=>{
   const ev=e.target.closest('[data-ev2]');
   if(ev){
     if(ev.dataset.kindev==='draft') return;          // 임시 블록은 눌러도 상세를 열지 않음
+    if(ev.dataset.kindev==='task'&&ignoreCalendarTaskClick) return;
     ev.dataset.kindev==='sev'?openEvent(ev.dataset.ev2):openTask(ev.dataset.ev2);
     return;
   }

@@ -1387,6 +1387,8 @@ function saveNoticeCfg(){
    저장 전에 이 토큰을 조건부 UPDATE로 선점하고, 선점에 성공한 탭만 최신 staff_data를
    다시 확인한 뒤 저장합니다. 다른 탭이 먼저 선점하면 현재 탭은 저장을 중단합니다. */
 let staffSaveTimer=null;
+let staffSavePromise=null;
+let staffSaveUrgent=false;
 let STAFF_DATA_RAW=null;
 let STAFF_DATA_READY=false;
 let STAFF_DATA_CONFLICT=false;
@@ -1461,14 +1463,33 @@ async function releaseStaffVersionLock(claimed){
     STAFF_VERSION_STATE=parseStaffVersionState(released);
   }catch(err){ console.warn('업무자료 버전 잠금 해제 실패:', err); }
 }
-function scheduleStaffSave(){
+function startStaffSave(){
+  staffSaveUrgent=false;
+  const p=persistStaffData();
+  staffSavePromise=p;
+  p.then(()=>{ if(staffSavePromise===p) staffSavePromise=null; },
+    ()=>{ if(staffSavePromise===p) staffSavePromise=null; });
+  return p;
+}
+function scheduleStaffSave(immediate=false){
   if(STAFF_DATA_CONFLICT) return;
   clearTimeout(staffSaveTimer);
   if(!STAFF_DATA_READY){
     STAFF_DATA_SAVE_QUEUED=true;
     return;
   }
-  staffSaveTimer=setTimeout(persistStaffData, 700);
+  if(immediate){
+    staffSaveUrgent=true;
+    staffSaveTimer=setTimeout(startStaffSave, 0);
+    return;
+  }
+  if(staffSaveUrgent) return;
+  staffSaveTimer=setTimeout(startStaffSave, 700);
+}
+async function flushStaffSave(){
+  clearTimeout(staffSaveTimer);
+  if(staffSavePromise) await staffSavePromise;
+  if(sb && hasStaffSession() && STAFF_DATA_READY && !STAFF_DATA_CONFLICT) await startStaffSave();
 }
 function stopStaffSaveOnConflict(){
   STAFF_DATA_CONFLICT=true;
@@ -1937,7 +1958,7 @@ function moveTaskFromStaffCalendar(taskId,newDate){
     task:t.id,what:`달력에서 일정 이동 ${oldLabel} → ${newLabel}`,
     why:'직원용 업무 캘린더에서 끌어 이동',
     affect:affected.length===1?affected[0].name:(affected.length?`${affected[0].name} 외 ${affected.length-1}건`:'-')});
-  afterMapEdit(); drawHist(); scheduleStaffSave();
+  afterMapEdit(); drawHist(); scheduleStaffSave(true);
   toast(`${t.name} 일정을 ${newDate}(으)로 옮겼습니다.${moved?` 후속 ${moved}건도 조정했습니다.`:''}`);
 }
 
@@ -2152,6 +2173,7 @@ function saveQuick(){
   const f=FLOWS.find(x=>x.id===t.flow);
   if(f){ if(!f.order) f.order=[]; if(!f.order.includes(t.id)) f.order.push(t.id); }
   syncOrder(); drawFlows(); drawDeptRows();
+  scheduleStaffSave(true);
   toast(`"${name}" 업무를 추가했습니다. 부서별 업무·연결 지도에도 함께 등록됩니다.`);
 }
 
@@ -2252,6 +2274,7 @@ function saveNewFull(){
   const f=FLOWS.find(x=>x.id===t.flow);
   if(f){ if(!f.order) f.order=[]; if(!f.order.includes(t.id)) f.order.push(t.id); }
   syncOrder(); drawFlows(); drawDeptRows();
+  scheduleStaffSave(true);
   closeDrawer();
   toast(isPub?`"${name}" 업무를 추가하고 학생용 캘린더에도 바로 표시했습니다.`
              :`"${name}" 업무를 추가했습니다. 캘린더·연결 지도에도 함께 등록됩니다.`);
@@ -3145,6 +3168,7 @@ async function tryUnlock(){
   }
 }
 async function signOutStaff(){
+  await flushStaffSave();
   if(sb) await sb.auth.signOut();
   staffUnlocked=false; staffAuthUser=null; STAFF_DATA_READY=false; STAFF_DATA_CONFLICT=false;
   setMode('student'); toast('직원용 화면에서 로그아웃했습니다.');

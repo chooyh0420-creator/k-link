@@ -2793,7 +2793,7 @@ document.addEventListener('click',e=>{
   const df=e.target.closest('[data-delflow]'); if(df){deleteFlow(df.dataset.delflow);return}
   const oc=e.target.closest('[data-opencard]'); if(oc){openTask(oc.dataset.opencard);return}
   const ae=e.target.closest('[data-addend]');
-  if(ae){ const t=byId(ae.dataset.addend); if(t){ t.end=t.date; afterMapEdit();
+  if(ae){ const t=byId(ae.dataset.addend); if(t){ t.end=addDays(t.date,1); afterMapEdit();
       const el=document.querySelector(`[data-setend="${t.id}"]`); if(el){ el.focus(); el.select(); } }
     return; }
   const de2=e.target.closest('[data-delend]');

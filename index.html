@@ -3226,7 +3226,17 @@ document.addEventListener('click',e=>{
     openNewFull({name:'', start:TODAY, end:TODAY, dept:deptFilter}); return;
   }
 
-  const mt=e.target.closest('[data-memotab]'); if(mt){memoFilter=mt.dataset.memotab;drawMemos();return}
+  const mt=e.target.closest('[data-memotab]');
+  if(mt){
+    memoFilter=mt.dataset.memotab;
+    /* 메모 부서 칩을 누르면 새 메모를 남길 부서도 함께 바꿉니다.
+       목록은 전체 누적 표시를 유지하고, 작성자 부서만 선택 부서로 반영합니다. */
+    if(memoFilter!=='all' && DEPTS.some(d=>d.id===memoFilter)){
+      myDept=memoFilter;
+      const deptSel=$('#deptSel'); if(deptSel) deptSel.value=myDept;
+    }
+    drawMemos(); return;
+  }
   const md=e.target.closest('[data-memodel]'); if(md){MEMOS=MEMOS.filter(m=>m.id!==md.dataset.memodel);drawMemos();return}
   const ro=e.target.closest('[data-replyopen]');
   if(ro){ openReply = (openReply===ro.dataset.replyopen) ? null : ro.dataset.replyopen; drawMemos(); return; }

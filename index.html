@@ -1438,10 +1438,15 @@ async function acquireStaffVersionLock(){
     return null;
   }
   const claimed=makeStaffVersionState(current.version, STAFF_DATA_INSTANCE, Date.now()+30000);
+  /* UPDATE 응답의 data는 RLS/반환 설정에 따라 비어 있을 수 있으므로,
+     반환 행 개수만으로 잠금 성공 여부를 판단하지 않습니다. UPDATE 후
+     현재 값을 다시 읽어 실제로 이 탭이 잠금을 확보했는지 확인합니다. */
   const result=await sb.from('klink_meta').update({value:claimed})
-    .eq('key','staff_data_version').eq('value',STAFF_VERSION_RAW).select('key');
+    .eq('key','staff_data_version').eq('value',STAFF_VERSION_RAW);
   if(result.error) throw result.error;
-  if(!result.data || !result.data.length){
+  const verify=await sb.from('klink_meta').select('value').eq('key','staff_data_version').maybeSingle();
+  if(verify.error) throw verify.error;
+  if(!verify.data || verify.data.value!==claimed){
     stopStaffSaveOnConflict();
     return null;
   }
@@ -1454,9 +1459,14 @@ async function releaseStaffVersionLock(claimed){
   const released=makeStaffVersionState(newStaffVersion(), '', 0);
   try{
     const result=await sb.from('klink_meta').update({value:released})
-      .eq('key','staff_data_version').eq('value',claimed).select('key');
-    if(result.error || !result.data || !result.data.length){
-      console.warn('업무자료 버전 잠금 해제 확인 실패:', result.error||'갱신된 행 없음');
+      .eq('key','staff_data_version').eq('value',claimed);
+    if(result.error){
+      console.warn('업무자료 버전 잠금 해제 확인 실패:', result.error);
+      return;
+    }
+    const verify=await sb.from('klink_meta').select('value').eq('key','staff_data_version').maybeSingle();
+    if(verify.error || !verify.data || verify.data.value!==released){
+      console.warn('업무자료 버전 잠금 해제 확인 실패:', verify.error||'갱신된 행 없음');
       return;
     }
     STAFF_VERSION_RAW=released;

@@ -1361,15 +1361,133 @@ function saveNoticeCfg(){
 }
 /* 업무 캘린더·부서별 업무·연결 지도·변경 이력·메모(TASKS/FLOWS/HISTORY/MEMOS)를
    통째로 클라우드에 저장합니다. 화면에서 뭔가 바뀔 때마다(클릭·입력·드래그 등)
-   0.7초 후 한 번만 저장하도록 묶어서(디바운스) 서버에 너무 자주 요청하지 않게 합니다. */
+   0.7초 후 한 번만 저장하도록 묶어서(디바운스) 서버에 너무 자주 요청하지 않게 합니다.
+
+   staff_data_version 행을 짧은 버전 토큰으로 사용합니다.
+   저장 전에 이 토큰을 조건부 UPDATE로 선점하고, 선점에 성공한 탭만 최신 staff_data를
+   다시 확인한 뒤 저장합니다. 다른 탭이 먼저 선점하면 현재 탭은 저장을 중단합니다. */
 let staffSaveTimer=null;
+let STAFF_DATA_RAW=null;
+let STAFF_DATA_READY=false;
+let STAFF_DATA_CONFLICT=false;
+let STAFF_DATA_SAVE_IN_FLIGHT=false;
+let STAFF_DATA_SAVE_QUEUED=false;
+let STAFF_VERSION_RAW=null;
+let STAFF_VERSION_STATE=null;
+const STAFF_DATA_INSTANCE='tab-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+function newStaffVersion(){
+  return Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);
+}
+function makeStaffVersionState(version, owner, lockedUntil){
+  return JSON.stringify({version, owner:owner||'', lockedUntil:lockedUntil||0});
+}
+function parseStaffVersionState(raw){
+  try{
+    const v=JSON.parse(raw);
+    return v && typeof v.version==='string' ? v : null;
+  }catch(_){ return null; }
+}
+async function ensureStaffVersion(){
+  if(STAFF_VERSION_RAW!==null && STAFF_VERSION_STATE) return true;
+  const initial=makeStaffVersionState(newStaffVersion(), '', 0);
+  try{
+    const inserted=await sb.from('klink_meta').insert({key:'staff_data_version', value:initial}).select('key,value');
+    if(!inserted.error && inserted.data && inserted.data.length){
+      STAFF_VERSION_RAW=initial;
+      STAFF_VERSION_STATE=parseStaffVersionState(initial);
+      return true;
+    }
+    const latest=await sb.from('klink_meta').select('value').eq('key','staff_data_version').maybeSingle();
+    if(latest.error || !latest.data) return false;
+    STAFF_VERSION_RAW=latest.data.value;
+    STAFF_VERSION_STATE=parseStaffVersionState(STAFF_VERSION_RAW);
+    return !!STAFF_VERSION_STATE;
+  }catch(err){
+    console.warn('업무자료 버전 준비 실패:', err);
+    return false;
+  }
+}
+async function acquireStaffVersionLock(){
+  if(!await ensureStaffVersion()) return null;
+  const current=STAFF_VERSION_STATE;
+  if(!current) return null;
+  if(current.lockedUntil> Date.now() && current.owner!==STAFF_DATA_INSTANCE){
+    stopStaffSaveOnConflict();
+    return null;
+  }
+  const claimed=makeStaffVersionState(current.version, STAFF_DATA_INSTANCE, Date.now()+30000);
+  const result=await sb.from('klink_meta').update({value:claimed})
+    .eq('key','staff_data_version').eq('value',STAFF_VERSION_RAW).select('key');
+  if(result.error) throw result.error;
+  if(!result.data || !result.data.length){
+    stopStaffSaveOnConflict();
+    return null;
+  }
+  STAFF_VERSION_RAW=claimed;
+  STAFF_VERSION_STATE=parseStaffVersionState(claimed);
+  return claimed;
+}
+async function releaseStaffVersionLock(claimed){
+  if(!claimed) return;
+  const released=makeStaffVersionState(newStaffVersion(), '', 0);
+  try{
+    const result=await sb.from('klink_meta').update({value:released})
+      .eq('key','staff_data_version').eq('value',claimed).select('key');
+    if(result.error || !result.data || !result.data.length){
+      console.warn('업무자료 버전 잠금 해제 확인 실패:', result.error||'갱신된 행 없음');
+      return;
+    }
+    STAFF_VERSION_RAW=released;
+    STAFF_VERSION_STATE=parseStaffVersionState(released);
+  }catch(err){ console.warn('업무자료 버전 잠금 해제 실패:', err); }
+}
 function scheduleStaffSave(){
+  if(STAFF_DATA_CONFLICT) return;
   clearTimeout(staffSaveTimer);
+  if(!STAFF_DATA_READY){
+    STAFF_DATA_SAVE_QUEUED=true;
+    return;
+  }
   staffSaveTimer=setTimeout(persistStaffData, 700);
 }
-function persistStaffData(){
+function stopStaffSaveOnConflict(){
+  STAFF_DATA_CONFLICT=true;
+  STAFF_DATA_SAVE_QUEUED=false;
+  clearTimeout(staffSaveTimer);
+  toast('다른 탭에서 업무자료가 먼저 변경되어 저장하지 않았습니다. 새로고침 후 다시 시도해주세요.');
+}
+async function persistStaffData(){
+  if(!sb || STAFF_DATA_CONFLICT) return;
+  if(!STAFF_DATA_READY){ STAFF_DATA_SAVE_QUEUED=true; return; }
+  if(STAFF_DATA_SAVE_IN_FLIGHT){ STAFF_DATA_SAVE_QUEUED=true; return; }
+  STAFF_DATA_SAVE_IN_FLIGHT=true;
   const snapshot={TASKS, FLOWS, HISTORY, MEMOS, seq, flowSeq, memoSeq, replySeq};
-  cloudSetMeta('staff_data', JSON.stringify(snapshot));
+  const nextRaw=JSON.stringify(snapshot);
+  let claimed=null;
+  try{
+    claimed=await acquireStaffVersionLock();
+    if(!claimed) return;
+    const latest=await sb.from('klink_meta').select('value').eq('key','staff_data').maybeSingle();
+    if(latest.error) throw latest.error;
+    const latestRaw=latest.data?latest.data.value:null;
+    if(latestRaw!==STAFF_DATA_RAW){
+      stopStaffSaveOnConflict();
+      return;
+    }
+    const result=await sb.from('klink_meta').upsert({key:'staff_data', value:nextRaw}).select('key');
+    if(result.error) throw result.error;
+    STAFF_DATA_RAW=nextRaw;
+  }catch(err){
+    console.warn('클라우드 저장 실패(업무자료):', err);
+    toast('업무자료 저장에 실패했습니다. 인터넷 연결을 확인해주세요.');
+  }finally{
+    await releaseStaffVersionLock(claimed);
+    STAFF_DATA_SAVE_IN_FLIGHT=false;
+    if(STAFF_DATA_SAVE_QUEUED && !STAFF_DATA_CONFLICT){
+      STAFF_DATA_SAVE_QUEUED=false;
+      scheduleStaffSave();
+    }
+  }
 }
 /* 지급일 업로드로 반영된 항목을 '삭제'하면 실제로는 이 목록(hidden_event_ids)에
    id를 추가해 화면(캘린더·목록 어디서든)에서만 숨깁니다. 되돌릴 수 있게 원본
@@ -1429,8 +1547,13 @@ async function initCloudSync(){
     if(metaMap.notice_config_history){
       try{ NOTICE_HISTORY=JSON.parse(metaMap.notice_config_history)||[]; }catch(_){ NOTICE_HISTORY=[]; }
     }
+    if(Object.prototype.hasOwnProperty.call(metaMap,'staff_data_version')){
+      STAFF_VERSION_RAW=metaMap.staff_data_version;
+      STAFF_VERSION_STATE=parseStaffVersionState(STAFF_VERSION_RAW);
+    }
     renderNoticeHistSelect();
-    if(metaMap.staff_data){
+    if(Object.prototype.hasOwnProperty.call(metaMap,'staff_data')){
+      STAFF_DATA_RAW=metaMap.staff_data;
       try{
         const snap=JSON.parse(metaMap.staff_data);
         if(snap && typeof snap==='object'){
@@ -1444,6 +1567,11 @@ async function initCloudSync(){
           if(typeof snap.replySeq==='number') replySeq=Math.max(replySeq, snap.replySeq);
         }
       }catch(_){ /* 무시 */ }
+    }
+    STAFF_DATA_READY=true;
+    if(STAFF_DATA_SAVE_QUEUED){
+      STAFF_DATA_SAVE_QUEUED=false;
+      scheduleStaffSave();
     }
   }catch(err){
     console.warn('클라우드 동기화 실패, 이 브라우저 메모리 데이터로만 표시합니다:', err);

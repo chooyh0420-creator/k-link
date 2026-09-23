@@ -823,6 +823,24 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 .foot-copyright{margin:10px 0 0; font-size:12px; color:var(--ink-3); opacity:.85}
 .foot-copyright .foot-meta{display:block; margin-top:2px; font-size:10.5px}
 
+/* ===== 학생용 장학금 캘린더 FAQ ===== */
+.student-faq{max-width:960px; margin:36px auto 26px; padding:0 16px}
+.student-faq h2{margin:0 0 14px; color:var(--ink-3); font-size:15px; font-weight:800}
+.student-faq-list{display:grid; gap:9px}
+.student-faq details{overflow:hidden; background:var(--surface); border:1px solid var(--line-soft);
+  border-radius:15px; box-shadow:var(--shadow)}
+.student-faq summary{position:relative; display:flex; min-height:62px; align-items:center; justify-content:space-between;
+  gap:14px; padding:15px 20px; color:var(--ink); font-size:14px; font-weight:700; line-height:1.55;
+  list-style:none; cursor:pointer}
+.student-faq summary::-webkit-details-marker{display:none}
+.student-faq summary::after{content:'+'; flex:0 0 30px; width:30px; height:30px; display:grid; place-items:center;
+  border-radius:9px; color:var(--brand); background:var(--brand-soft); font-size:21px; line-height:1; font-weight:500}
+.student-faq details[open] summary::after{content:'−'}
+.student-faq summary:focus-visible{outline:2px solid var(--brand); outline-offset:-3px; border-radius:15px}
+.student-faq .faq-answer{padding:0 20px 18px; color:var(--ink-2); font-size:13px; line-height:1.8}
+.student-faq .faq-answer p{margin:0}
+.student-faq .faq-answer a{color:var(--brand); font-weight:700; text-underline-offset:3px}
+
 @media (max-width:600px){
   .gnb{padding:0 12px}
   .gnb-in{height:auto; min-height:auto; padding:9px 0; flex-wrap:wrap; align-items:center; gap:6px; row-gap:6px}
@@ -868,6 +886,9 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 
   .page-foot{margin:26px auto 18px}
   .page-foot .foot-btn{font-size:12px; padding:8px 13px}
+  .student-faq{margin:28px auto 20px; padding:0 4px}
+  .student-faq summary{min-height:58px; padding:13px 14px; font-size:13px}
+  .student-faq .faq-answer{padding:0 14px 15px; font-size:12.5px}
 
   /* 자료 업데이트 + 범례를 좁은 화면에서도 최대한 한 줄로 유지 */
   .cal-meta{gap:5px; flex-wrap:wrap; padding:0 12px 12px; justify-content:center}
@@ -1196,6 +1217,28 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
     <div class="tbl-wrap stbl-list"><table>
       <thead><tr><th>구분</th><th>장학금</th><th>기간 / 일자</th></tr></thead>
       <tbody id="sRows"></tbody></table></div>
+  </section>
+
+  <section class="student-faq" aria-labelledby="studentFaqTitle">
+    <h2 id="studentFaqTitle">꼭 알아두기</h2>
+    <div class="student-faq-list">
+      <details>
+        <summary>캘린더에 보이는 지급일은 확정인가요?</summary>
+        <div class="faq-answer"><p>캘린더의 지급일은 학생들이 일정을 확인하는 데 도움을 드리기 위한 예정일이며, 확정일을 보장하지 않습니다. 장학금 지급 절차나 학생 계좌·은행 사정 등에 따라 실제 입금일이 달라질 수 있습니다. 변경이 확인되면 캘린더에 반영하니 참고용으로 확인해 주세요.</p></div>
+      </details>
+      <details>
+        <summary>내 장학금이 캘린더에 안 보여요</summary>
+        <div class="faq-answer"><p>달력의 월과 ‘달력에 표시할 장학금’ 선택 항목을 먼저 확인해 주세요. 해당 월에 일정이 없거나 아직 지급일이 정해지지 않은 장학금은 달력에 표시되지 않을 수 있습니다. ‘장학금 일정 전체보기’에서도 찾을 수 없다면, 관련 공지나 장학복지팀에 일정을 확인해 주세요. 캘린더에 없다는 이유만으로 장학 대상이 아니라고 볼 수는 없습니다.</p></div>
+      </details>
+      <details>
+        <summary>장학금 신청은 어디서 하나요?</summary>
+        <div class="faq-answer"><p>신청 방법은 장학금마다 다릅니다. 일정의 상세 내용을 열어 안내 문구와 ‘바로가기’를 확인하고, 연결된 공식 공지에서 신청 기간·자격·제출 서류를 확인해 주세요. 한국장학재단이나 외부 기관 장학금은 해당 기관에서 별도로 신청해야 할 수 있습니다.</p></div>
+      </details>
+      <details>
+        <summary>내게 맞는 장학금을 찾아주세요</summary>
+        <div class="faq-answer"><p>장학금 자가진단 사이트에서 입력한 학적·성적 등 기본 조건을 바탕으로 해당할 수 있는 장학금과 예상 지원 내용, 신청 방법을 확인할 수 있습니다. 진단 결과는 참고용이며 실제 선발 여부와 지원 금액은 해당 학기 공고와 심사 기준에 따라 달라질 수 있습니다. <a href="https://kmu-scholarship.netlify.app/" target="_blank" rel="noopener noreferrer">장학금 자가진단 바로가기 ↗</a></p></div>
+      </details>
+    </div>
   </section>
 
   <div class="page-foot">

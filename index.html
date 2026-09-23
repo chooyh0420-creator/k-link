@@ -1046,8 +1046,18 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
         </div>
       </div>
       <div id="uploadHistory" class="hint" style="margin-top:10px">
-        <b style="display:block;margin-bottom:8px">업로드 이력</b>
-        <div id="uploadHistoryList"></div>
+        <button type="button" id="uploadHistoryToggle" class="mini" aria-expanded="false"
+          style="display:flex;align-items:center;gap:8px;width:100%;justify-content:space-between;text-align:left">
+          <span><b>업로드 이력</b> <span id="uploadHistoryCount" style="color:var(--ink-3)">(0건)</span></span>
+          <span id="uploadHistoryArrow" aria-hidden="true">⌄</span>
+        </button>
+        <div id="uploadHistoryBody" hidden style="margin-top:10px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <label for="uploadHistoryMonth" style="font-size:12px;color:var(--ink-3)">조회 월</label>
+            <select id="uploadHistoryMonth" class="mini" style="min-width:150px"></select>
+          </div>
+          <div id="uploadHistoryList"></div>
+        </div>
       </div>
     </div>
 
@@ -1208,6 +1218,8 @@ const S_KIND=[
 let PAY_UPDATED_AT=null;
 let PAY_UPLOAD_HISTORY=[];
 let NEW_IMPORT_IDS=new Set();
+let UPLOAD_HISTORY_OPEN=false;
+let UPLOAD_HISTORY_MONTH='';
 try{ PAY_UPDATED_AT = localStorage.getItem('klink_pay_updated_at'); }catch(_){}
 function markPayUpdated(){
   PAY_UPDATED_AT = new Date().toISOString();
@@ -2943,11 +2955,26 @@ function autoImportMatched(matched){
   return newEvents||[];
 }
 function drawUploadHistory(){
-  const el=$('#uploadHistoryList'); if(!el) return;
+  const el=$('#uploadHistoryList'), body=$('#uploadHistoryBody'), sel=$('#uploadHistoryMonth');
+  if(!el||!body||!sel) return;
+  const count=$('#uploadHistoryCount'); if(count) count.textContent=`(${PAY_UPLOAD_HISTORY.length}건)`;
+  body.hidden=!UPLOAD_HISTORY_OPEN;
+  const toggle=$('#uploadHistoryToggle');
+  if(toggle) toggle.setAttribute('aria-expanded',String(UPLOAD_HISTORY_OPEN));
+  const arrow=$('#uploadHistoryArrow'); if(arrow) arrow.textContent=UPLOAD_HISTORY_OPEN?'⌃':'⌄';
   if(!PAY_UPLOAD_HISTORY.length){
+    sel.innerHTML='<option value="">기록 없음</option>';
     el.innerHTML='<span style="color:var(--ink-3)">아직 업로드 이력이 없습니다.</span>'; return;
   }
-  el.innerHTML=`<div style="display:grid;gap:6px">${PAY_UPLOAD_HISTORY.map(h=>{
+  const monthKey=h=>String(h.at||'').slice(0,7);
+  const months=[...new Set(PAY_UPLOAD_HISTORY.map(monthKey).filter(Boolean))].sort().reverse();
+  if(!months.includes(UPLOAD_HISTORY_MONTH)) UPLOAD_HISTORY_MONTH=months[0];
+  sel.innerHTML=months.map(m=>{
+    const [y,mo]=m.split('-');
+    return `<option value="${m}" ${m===UPLOAD_HISTORY_MONTH?'selected':''}>${y}년 ${+mo}월</option>`;
+  }).join('');
+  const visible=PAY_UPLOAD_HISTORY.filter(h=>monthKey(h)===UPLOAD_HISTORY_MONTH);
+  el.innerHTML=visible.length?`<div style="display:grid;gap:6px">${visible.map(h=>{
     let when=h.at||'';
     try{when=new Date(h.at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false});}catch(_){ }
     const blue=h.newCount>0?'color:#2563EB;font-weight:800':'';
@@ -2956,7 +2983,7 @@ function drawUploadHistory(){
       <div style="margin-top:3px">전체 ${h.totalRows||0}건 · 지출 ${h.payRows||0}건 · 키워드 일치 ${h.matchedCount||0}건 · 중복 ${h.duplicateCount||0}건 · 오류 ${h.errorRows||0}건</div>
       <div style="margin-top:3px;${blue}">신규 업데이트 ${h.newCount||0}건${h.newCount?'  ← 새 전표번호':''}</div>
     </div>`;
-  }).join('')}</div>`;
+  }).join('')}</div>`:'<span style="color:var(--ink-3)">선택한 월에 업로드 이력이 없습니다.</span>';
 }
 function drawImportedList(){
   if($('#manDate') && !$('#manDate').value) $('#manDate').value=TODAY;
@@ -3227,6 +3254,12 @@ document.addEventListener('click',e=>{
   if(e.target.id==='exAdd'){addExcludeKeyword();return}
   if(e.target.id==='importConfirm'){confirmImport();return}
   if(e.target.id==='importCancel'){clearImportCheck();return}
+  if(e.target.id==='uploadHistoryToggle'){
+    UPLOAD_HISTORY_OPEN=!UPLOAD_HISTORY_OPEN;
+    drawUploadHistory();
+    e.__noStaffSave=true;
+    return;
+  }
   const di=e.target.closest('[data-delimp]');
   if(di){ const ev=S_EVENTS.find(x=>x.id===di.dataset.delimp); deleteImportedEvent(di.dataset.delimp);
     if(ev) toast(`"${ev.name}" 항목을 학생용 캘린더에서 삭제했습니다.`);
@@ -3248,7 +3281,7 @@ document.addEventListener('click',e=>{
     closeQuickpop();
   }
   })(e);
-  scheduleStaffSave();
+  if(!e.__noStaffSave) scheduleStaffSave();
 });
 $('#scrim').addEventListener('click',closeDrawer);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeQuickpop()}});
@@ -3361,6 +3394,12 @@ document.addEventListener('change', e=>{
     if(f){ clearImportCheck(); $('#fileName').textContent=f.name; readSheet(f); }
     return;
   }
+  if(e.target.id==='uploadHistoryMonth'){
+    UPLOAD_HISTORY_MONTH=e.target.value;
+    drawUploadHistory();
+    e.__noStaffSave=true;
+    return;
+  }
   const ik=e.target.closest('[data-impkind]');
   if(ik){
     const ev=S_EVENTS.find(x=>x.id===ik.dataset.impkind);
@@ -3385,7 +3424,7 @@ document.addEventListener('change', e=>{
     return;
   }
   })(e);
-  scheduleStaffSave();
+  if(!e.__noStaffSave) scheduleStaffSave();
 });
 document.addEventListener('blur', e=>{
   (function(e){

@@ -2162,12 +2162,6 @@ function openNewFull(opts){
       <div class="field"><label for="nfDate">시작일</label><input type="date" id="nfDate" value="${start}"></div>
       <div class="field"><label for="nfEnd">종료일</label><input type="date" id="nfEnd" value="${end}"></div>
     </div>
-    <div class="field"><label for="nfFlow">속한 흐름</label>
-      <select id="nfFlow">${FLOWS.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select></div>
-    <div class="field"><label for="nfCri">완료 기준</label>
-      <textarea id="nfCri" placeholder="한 줄에 하나씩 적어주세요&#10;예)&#10;대상자 명단 확정&#10;재무팀 전달자료 생성&#10;전달 일시 기록"></textarea></div>
-    <div class="field"><label for="nfFiles">전달자료 (쉼표로 구분)</label>
-      <input type="text" id="nfFiles" placeholder="예: 대상자 명단, 검증 결과표"></div>
     <div class="dr-sec">
       <h4>학생 공개</h4>
       <label class="switch">
@@ -2198,12 +2192,10 @@ function openNewFull(opts){
 function saveNewFull(){
   const name=$('#nfName').value.trim();
   if(!name){toast('업무명을 입력해주세요.');$('#nfName').focus();return}
-  const cri=$('#nfCri').value.split('\n').map(s=>s.trim()).filter(Boolean).map(s=>[s,false]);
-  const files=$('#nfFiles').value.split(',').map(s=>s.trim()).filter(Boolean);
   const date=$('#nfDate').value, end=$('#nfEnd').value||date;
   const t=addTask({name, dept:$('#nfDept').value, owner:$('#nfOwner').value.trim(), date, end,
-    flow:$('#nfFlow').value,
-    files, criteria:cri});
+    flow:FLOWS[0]&&FLOWS[0].id,
+    files:[], criteria:[]});
   const pubOn=$('#nfPubOn'), isPub=!!(pubOn&&pubOn.checked);
   if(isPub){
     t.isPublic=true;

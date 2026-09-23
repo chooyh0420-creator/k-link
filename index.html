@@ -779,6 +779,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 .cf-allbtn{font-size:11px; font-weight:700; color:var(--brand); background:none; border:0; cursor:pointer; text-decoration:underline}
 .cf-list{max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:2px}
 .cf-empty{font-size:12px; color:var(--ink-3); padding:8px 2px}
+.cf-no-events{padding:12px 16px;color:var(--ink-2);font-size:14px;font-weight:700;background:var(--brand-soft);border-bottom:1px solid var(--line-soft)}
 .cf-item{display:flex; align-items:center; gap:9px; padding:8px 6px; border-radius:8px; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--ink); word-break:keep-all}
 .cf-item:hover{background:var(--surface-2)}
 .cf-item input{width:16px; height:16px; accent-color:var(--brand); flex:0 0 auto}
@@ -1155,6 +1156,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
           </div>
         </div>
       </div>
+      <div class="cf-no-events" id="cfNoEvents" role="status" hidden>해당장학을 찾을 수 없어요😧</div>
       <div class="hint" id="sHintBox"><span class="hint-track" id="sHintTrack"></span></div>
       <div class="dow"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
       <div id="sCalBody"></div>
@@ -2519,6 +2521,7 @@ const studentEvents=()=>{
 function drawStudent(){
   drawHintMarquee();
   drawCalFilter();
+  drawCalFilterEmptyNotice();
   renderCalendar($('#sCalBody'),$('#sCalTitle'),sCalY,sCalM,studentEvents(),false);
   const legendHtml=[{id:'all',name:'전체',color:null}].concat(S_KIND).map(k=>
     `<button type="button" class="legend-btn" data-skind="${k.id}" aria-pressed="${k.id===sFilter}"${k.color?` style="--k-color:${k.color}"`:''}>${k.color?`<i style="background:${k.color}"></i>`:''}${esc(k.name)}</button>`
@@ -2730,10 +2733,9 @@ function filterKeywordFor(name){
 }
 let CAL_FILTER_SEL=null;
 function calFilterOptions(){
-  /* 현재 학생용 캘린더에 실제로 존재하는 이벤트 기준으로만 선택지를 보여줍니다. */
-  const present=new Set();
-  allStudentEvents().forEach(e=>{ const k=filterKeywordFor(e.name); if(k) present.add(k.id); });
-  return KEYWORDS.filter(k=>present.has(k.id)).map(k=>({id:k.id, name:k.label||k.word}));
+  /* 운영자가 표기할 장학 목록에 등록한 키워드를 모두 보여줍니다.
+     화면 이름은 결의제목용 표기(label)가 아니라 목록의 장학명(word)을 사용합니다. */
+  return KEYWORDS.map(k=>({id:k.id, name:k.word}));
 }
 function ensureCalFilterSel(){
   const opts=calFilterOptions();
@@ -2777,6 +2779,18 @@ function drawCalFilter(){
   const opts=calFilterOptions(), sel=ensureCalFilterSel();
   list.innerHTML = opts.length ? opts.map(o=>`<label class="cf-item"><input type="checkbox" data-cfid="${o.id}" ${sel.has(o.id)?'checked':''}>${esc(o.name)}</label>`).join('')
     : '<div class="cf-empty">표시할 장학금이 없습니다.</div>';
+}
+function drawCalFilterEmptyNotice(){
+  const notice=$('#cfNoEvents'); if(!notice)return;
+  const opts=calFilterOptions(),sel=ensureCalFilterSel();
+  const selected=opts.filter(o=>sel.has(o.id));
+  const weeks=monthMatrix(sCalY,sCalM);
+  const visibleStart=weeks[0][0].iso,visibleEnd=weeks[weeks.length-1][6].iso;
+  const found=selected.length>0&&allStudentEvents().some(e=>{
+    const k=filterKeywordFor(e.name);
+    return k&&selected.some(o=>o.id===k.id)&&(sFilter==='all'||e.kind===sFilter)&&e.start<=visibleEnd&&e.end>=visibleStart;
+  });
+  notice.hidden=!selected.length||found;
 }
 
 

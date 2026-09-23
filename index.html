@@ -617,6 +617,11 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .field select,.field input,.field textarea{width:100%; font-family:inherit; font-size:13px; padding:8px 10px;
   border:1px solid var(--line-strong); border-radius:6px; background:var(--surface); color:var(--ink)}
 .field textarea{min-height:88px; resize:vertical; line-height:1.6}
+.rich-editor{min-height:110px;resize:vertical;overflow:auto;line-height:1.6;white-space:pre-wrap;
+  border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink);padding:8px 10px}
+.rich-editor:empty:before{content:attr(data-placeholder);color:var(--ink-3);pointer-events:none}
+.rich-editor a{color:var(--brand);text-decoration:underline;text-underline-offset:2px}
+.rich-tools{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .field .hintline{font-size:11px; color:var(--ink-3); margin-top:4px}
 .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
 .btn{font-size:13px; font-weight:700; padding:9px 16px; border-radius:6px; white-space:nowrap;
@@ -1716,6 +1721,53 @@ const linkifyDesc=s=>esc(s).replace(/(https?:\/\/[^\s<]+)/g,m=>{
   const suffix=m.slice(url.length);
   return `<a href="${url}" target="_blank" rel="noopener">${url}</a>${suffix}`;
 }).replace(/\n/g,'<br>');
+function sanitizeRichHtml(html){
+  const doc=new DOMParser().parseFromString(String(html||''),'text/html');
+  const walk=node=>{
+    if(node.nodeType===Node.TEXT_NODE)return esc(node.nodeValue||'');
+    if(node.nodeType!==Node.ELEMENT_NODE)return '';
+    const tag=node.tagName.toLowerCase(),children=Array.from(node.childNodes).map(walk).join('');
+    if(tag==='br')return '<br>';
+    if(tag==='a'){
+      const href=node.getAttribute('href')||'';
+      if(!/^https?:\/\//i.test(href))return children;
+      return `<a href="${esc(href)}" target="_blank" rel="noopener">${children}</a>`;
+    }
+    if(tag==='div'||tag==='p')return `${children}<br>`;
+    return children;
+  };
+  return Array.from(doc.body.childNodes).map(walk).join('').replace(/(?:<br>)+$/,'');
+}
+function editorHtmlFromText(value){
+  const raw=String(value||'');
+  if(/<\s*a\b/i.test(raw))return sanitizeRichHtml(raw);
+  return linkifyDesc(raw);
+}
+function publicDescriptionHtml(value){
+  const raw=String(value||'');
+  return /<\s*a\b/i.test(raw)?sanitizeRichHtml(raw):linkifyDesc(raw);
+}
+function insertEditorLink(editorId){
+  const editor=document.getElementById(editorId); if(!editor)return;
+  const sel=window.getSelection();
+  let range=sel&&sel.rangeCount?sel.getRangeAt(0).cloneRange():null;
+  if(!range||!editor.contains(range.commonAncestorContainer)){
+    editor.focus(); range=document.createRange(); range.selectNodeContents(editor); range.collapse(false);
+  }
+  const selected=range.toString();
+  const label=selected||window.prompt('링크로 연결할 글자를 입력하세요.');
+  if(!label)return;
+  const typedUrl=window.prompt('연결할 주소(URL)를 입력하세요.','https://');
+  if(!typedUrl)return;
+  let url;
+  try{url=new URL(typedUrl.trim());}catch(_){toast('올바른 URL을 입력해주세요.');return;}
+  if(!['http:','https:'].includes(url.protocol)){toast('http 또는 https 주소만 연결할 수 있습니다.');return;}
+  const a=document.createElement('a');a.href=url.href;a.target='_blank';a.rel='noopener';
+  if(selected)a.appendChild(range.extractContents());else a.textContent=label;
+  range.insertNode(a);
+  const after=document.createRange();after.setStartAfter(a);after.collapse(true);
+  sel.removeAllRanges();sel.addRange(after);editor.focus();
+}
 const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
 const diffDays=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
 /* YYYY-MM-DD 형식이면서 실제로 존재하는 날짜인지 확인 (예: 2027-02-30은 거부) */
@@ -2184,7 +2236,8 @@ function openNewFull(opts){
             <input type="url" id="nfPubUrl" placeholder="https://"></div>
         </div>
         <div class="field"><label for="nfPubDesc">안내 문구</label>
-          <textarea id="nfPubDesc" placeholder="학생에게 보여줄 설명 (선택)"></textarea></div>
+          <div class="rich-tools"><button class="btn ghost btn-sm" type="button" data-add-link="nfPubDesc" onmousedown="event.preventDefault()">링크 삽입</button><small style="color:var(--ink-3)">글자를 선택한 뒤 주소를 연결하세요.</small></div>
+          <div id="nfPubDesc" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="학생에게 보여줄 설명 (선택)"></div></div>
         <div class="hintline">업무를 추가하면 바로 학생용 캘린더에도 함께 표시됩니다.</div>
       </div>
     </div>
@@ -2207,7 +2260,7 @@ function saveNewFull(){
     t.publicLabel=$('#nfPubLabel').value.trim();
     t.publicKind=$('#nfPubKind').value;
     t.publicUrl=$('#nfPubUrl').value.trim();
-    t.publicDesc=$('#nfPubDesc').value.trim();
+    t.publicDesc=sanitizeRichHtml($('#nfPubDesc').innerHTML);
   }
   const f=FLOWS.find(x=>x.id===t.flow);
   if(f){ if(!f.order) f.order=[]; if(!f.order.includes(t.id)) f.order.push(t.id); }
@@ -2558,9 +2611,10 @@ function openTask(id){
           <select id="pubKind">${S_KIND.map(k=>`<option value="${k.id}" ${k.id===(t.publicKind||'pay')?'selected':''}>${esc(k.name)}</option>`).join('')}</select></div>
         <div class="field"><label for="pubUrl">바로가기 링크</label>
           <input type="url" id="pubUrl" value="${esc(t.publicUrl||'')}" placeholder="https://">
-          <small style="display:block;margin-top:5px;color:var(--ink-3)">학생 화면에는 바로가기 버튼 하나로 표시됩니다. 안내 문구에 URL이 있으면 이 링크가 우선 사용됩니다.</small></div>
+          <small style="display:block;margin-top:5px;color:var(--ink-3)">학생 화면 아래쪽에 별도 바로가기 버튼으로 표시됩니다. 안내 문구 안의 링크는 본문에 표시됩니다.</small></div>
         <div class="field"><label for="pubDesc">안내 문구</label>
-          <textarea id="pubDesc" placeholder="학생에게 보여줄 설명 (선택)">${esc(t.publicDesc||'')}</textarea></div>
+          <div class="rich-tools"><button class="btn ghost btn-sm" type="button" data-add-link="pubDesc" onmousedown="event.preventDefault()">링크 삽입</button><small style="color:var(--ink-3)">글자를 선택한 뒤 주소를 연결하세요.</small></div>
+          <div id="pubDesc" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="학생에게 보여줄 설명 (선택)">${editorHtmlFromText(t.publicDesc||'')}</div></div>
         <button class="btn btn-sm" id="pubSave" data-task="${t.id}">공개 내용 저장</button>
       </div>
     </div>
@@ -2582,7 +2636,7 @@ function openEvent(id){
       <dt>${e.start===e.end?'일자':'기간'}</dt><dd>${e.start===e.end?e.start:`${e.start} ~ ${e.end}`}</dd>
       <dt>남은 기간</dt><dd>${diffDays(TODAY,e.start)>0?`${diffDays(TODAY,e.start)}일 뒤 시작`:diffDays(TODAY,e.end)>=0?'진행 중':'종료됨'}</dd>
       <dt>문의</dt><dd>${esc(e.where)}</dd></dl>
-    <div class="note">${e.desc?linkifyDesc(e.desc):'등록된 안내 문구가 없습니다.'}</div>
+    <div class="note">${e.desc?publicDescriptionHtml(e.desc):'등록된 안내 문구가 없습니다.'}</div>
     ${shortcutUrl?`<a href="${esc(shortcutUrl)}" target="_blank" rel="noopener" class="btn btn-sm"
       style="display:inline-block;margin-top:14px;text-decoration:none">바로가기 ↗</a>`:''}`;
   $('#drawer').hidden=false;$('#scrim').hidden=false;$('#drClose').focus();
@@ -3318,6 +3372,8 @@ $('#drawer').addEventListener('change',e=>{
 $('#drawer').addEventListener('click',e=>{
   (function(e){
   if(e.target.id==='drClose'||e.target.id==='nfCancel'){closeDrawer();return}
+  const linkBtn=e.target.closest('[data-add-link]');
+  if(linkBtn){insertEditorLink(linkBtn.dataset.addLink);return}
   if(e.target.id==='nfSave'){saveNewFull();return}
   if(e.target.id==='tiSave'){
     const t=byId(e.target.dataset.task); if(!t) return;
@@ -3345,7 +3401,7 @@ $('#drawer').addEventListener('click',e=>{
     t.publicLabel=$('#pubLabel').value.trim();
     t.publicKind=$('#pubKind').value;
     t.publicUrl=$('#pubUrl').value.trim();
-    t.publicDesc=$('#pubDesc').value.trim();
+    t.publicDesc=sanitizeRichHtml($('#pubDesc').innerHTML);
     t.isPublic=true;
     drawDeptRows();
     closeDrawer();

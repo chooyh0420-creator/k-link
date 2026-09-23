@@ -1052,9 +1052,11 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
           <span id="uploadHistoryArrow" aria-hidden="true">⌄</span>
         </button>
         <div id="uploadHistoryBody" hidden style="margin-top:10px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+            <label for="uploadHistoryYear" style="font-size:12px;color:var(--ink-3)">조회 연도</label>
+            <select id="uploadHistoryYear" class="mini" style="min-width:110px"></select>
             <label for="uploadHistoryMonth" style="font-size:12px;color:var(--ink-3)">조회 월</label>
-            <select id="uploadHistoryMonth" class="mini" style="min-width:150px"></select>
+            <select id="uploadHistoryMonth" class="mini" style="min-width:100px"></select>
           </div>
           <div id="uploadHistoryList"></div>
         </div>
@@ -1219,6 +1221,7 @@ let PAY_UPDATED_AT=null;
 let PAY_UPLOAD_HISTORY=[];
 let NEW_IMPORT_IDS=new Set();
 let UPLOAD_HISTORY_OPEN=false;
+let UPLOAD_HISTORY_YEAR='';
 let UPLOAD_HISTORY_MONTH='';
 try{ PAY_UPDATED_AT = localStorage.getItem('klink_pay_updated_at'); }catch(_){}
 function markPayUpdated(){
@@ -2955,24 +2958,29 @@ function autoImportMatched(matched){
   return newEvents||[];
 }
 function drawUploadHistory(){
-  const el=$('#uploadHistoryList'), body=$('#uploadHistoryBody'), sel=$('#uploadHistoryMonth');
-  if(!el||!body||!sel) return;
+  const el=$('#uploadHistoryList'), body=$('#uploadHistoryBody'), yearSel=$('#uploadHistoryYear'), monthSel=$('#uploadHistoryMonth');
+  if(!el||!body||!yearSel||!monthSel) return;
   const count=$('#uploadHistoryCount'); if(count) count.textContent=`(${PAY_UPLOAD_HISTORY.length}건)`;
   body.hidden=!UPLOAD_HISTORY_OPEN;
   const toggle=$('#uploadHistoryToggle');
   if(toggle) toggle.setAttribute('aria-expanded',String(UPLOAD_HISTORY_OPEN));
   const arrow=$('#uploadHistoryArrow'); if(arrow) arrow.textContent=UPLOAD_HISTORY_OPEN?'⌃':'⌄';
   if(!PAY_UPLOAD_HISTORY.length){
-    sel.innerHTML='<option value="">기록 없음</option>';
+    yearSel.innerHTML='<option value="">기록 없음</option>';
+    monthSel.innerHTML='<option value="">기록 없음</option>';
     el.innerHTML='<span style="color:var(--ink-3)">아직 업로드 이력이 없습니다.</span>'; return;
   }
   const monthKey=h=>String(h.at||'').slice(0,7);
   const months=[...new Set(PAY_UPLOAD_HISTORY.map(monthKey).filter(Boolean))].sort().reverse();
-  if(!months.includes(UPLOAD_HISTORY_MONTH)) UPLOAD_HISTORY_MONTH=months[0];
-  sel.innerHTML=months.map(m=>{
-    const [y,mo]=m.split('-');
-    return `<option value="${m}" ${m===UPLOAD_HISTORY_MONTH?'selected':''}>${y}년 ${+mo}월</option>`;
-  }).join('');
+  const years=[...new Set(months.map(m=>m.slice(0,4)))].sort().reverse();
+  if(!years.includes(UPLOAD_HISTORY_YEAR)) UPLOAD_HISTORY_YEAR=years[0];
+  const yearMonths=months.filter(m=>m.startsWith(UPLOAD_HISTORY_YEAR+'-'));
+  if(!yearMonths.includes(UPLOAD_HISTORY_MONTH)) UPLOAD_HISTORY_MONTH=yearMonths[0]||'';
+  yearSel.innerHTML=years.map(y=>`<option value="${y}" ${y===UPLOAD_HISTORY_YEAR?'selected':''}>${y}년</option>`).join('');
+  monthSel.innerHTML=yearMonths.length?yearMonths.map(m=>{
+    const mo=m.slice(5,7);
+    return `<option value="${m}" ${m===UPLOAD_HISTORY_MONTH?'selected':''}>${+mo}월</option>`;
+  }).join(''):'<option value="">기록 없음</option>';
   const visible=PAY_UPLOAD_HISTORY.filter(h=>monthKey(h)===UPLOAD_HISTORY_MONTH);
   el.innerHTML=visible.length?`<div style="display:grid;gap:6px">${visible.map(h=>{
     let when=h.at||'';
@@ -3392,6 +3400,13 @@ document.addEventListener('change', e=>{
   if(e.target.id==='fileInput'){
     const f=e.target.files&&e.target.files[0];
     if(f){ clearImportCheck(); $('#fileName').textContent=f.name; readSheet(f); }
+    return;
+  }
+  if(e.target.id==='uploadHistoryYear'){
+    UPLOAD_HISTORY_YEAR=e.target.value;
+    UPLOAD_HISTORY_MONTH='';
+    drawUploadHistory();
+    e.__noStaffSave=true;
     return;
   }
   if(e.target.id==='uploadHistoryMonth'){

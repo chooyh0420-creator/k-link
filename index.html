@@ -788,11 +788,15 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 .cf-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
 .cf-head span{font-size:11.5px; font-weight:800; color:var(--ink-3)}
 .cf-allbtn{font-size:11px; font-weight:700; color:var(--brand); background:none; border:0; cursor:pointer; text-decoration:underline}
-.cf-list{max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:2px}
+.cf-list-shell{display:flex; align-items:stretch; gap:6px; max-height:280px}
+.cf-list{flex:1 1 auto; min-width:0; max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:2px; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior:contain}
+.cf-list::-webkit-scrollbar{display:none; width:0; height:0}
+.cf-scroll-track{display:none; position:relative; flex:0 0 7px; width:7px; margin:3px 1px; border-radius:99px; background:#e4eaf1; cursor:pointer; touch-action:none}
+.cf-scroll-thumb{position:absolute; top:0; left:0; width:100%; min-height:24px; border-radius:99px; background:#536f91; box-shadow:0 0 0 1px rgba(255,255,255,.55) inset}
 .cf-empty{font-size:12px; color:var(--ink-3); padding:8px 2px}
 .cf-no-events{padding:12px 16px;color:var(--ink-2);font-size:14px;font-weight:700;background:var(--brand-soft);border-bottom:1px solid var(--line-soft)}
 .cal-filter-pop .cf-no-events{margin:-4px -4px 10px;padding:8px 10px;border:1px solid var(--line-soft);border-radius:8px;font-size:11.5px;white-space:nowrap}
-.cf-item{display:flex; align-items:center; gap:9px; padding:8px 6px; border-radius:8px; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--ink); word-break:keep-all}
+.cf-item{display:flex; flex:0 0 auto; align-items:center; gap:9px; padding:8px 6px; border-radius:8px; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--ink); word-break:keep-all}
 .cf-item:hover{background:var(--surface-2)}
 .cf-item input{width:16px; height:16px; accent-color:var(--brand); flex:0 0 auto}
 
@@ -1170,7 +1174,10 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
           </button>
           <div class="cal-filter-pop" id="calFilterPop" hidden>
             <div class="cf-head"><span>달력에 표시할 장학금</span><button type="button" class="cf-allbtn" id="cfSelAll">전체선택</button></div>
-            <div class="cf-list" id="cfList"></div>
+            <div class="cf-list-shell">
+              <div class="cf-list" id="cfList"></div>
+              <div class="cf-scroll-track" id="cfScrollTrack" aria-hidden="true"><div class="cf-scroll-thumb" id="cfScrollThumb"></div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -2829,6 +2836,19 @@ function drawCalFilter(){
   const opts=calFilterOptions(), sel=ensureCalFilterSel();
   list.innerHTML = opts.length ? opts.map(o=>`<label class="cf-item"><input type="checkbox" data-cfid="${o.id}" ${sel.has(o.id)?'checked':''}>${esc(o.name)}</label>`).join('')
     : '<div class="cf-empty">표시할 장학금이 없습니다.</div>';
+  requestAnimationFrame(updateCalFilterScrollbar);
+}
+function updateCalFilterScrollbar(){
+  const list=$('#cfList'),track=$('#cfScrollTrack'),thumb=$('#cfScrollThumb');
+  if(!list||!track||!thumb)return;
+  const overflow=list.scrollHeight-list.clientHeight;
+  if(overflow<=1||list.clientHeight===0){track.style.display='none';return;}
+  track.style.display='block';
+  const trackHeight=track.clientHeight;
+  const thumbHeight=Math.min(trackHeight,Math.max(24,trackHeight*list.clientHeight/list.scrollHeight));
+  const thumbTop=(list.scrollTop/overflow)*(trackHeight-thumbHeight);
+  thumb.style.height=`${thumbHeight}px`;
+  thumb.style.transform=`translateY(${thumbTop}px)`;
 }
 function drawCalFilterEmptyNotice(){
   const notice=$('#cfNoEvents'); if(!notice)return;
@@ -3693,6 +3713,18 @@ restoreStaffSession();
 (function(){
   const btn=$('#calFilterBtn'), pop=$('#calFilterPop'), wrap=$('#calFilterWrap');
   if(!btn||!pop||!wrap) return;
+  const list=$('#cfList'),track=$('#cfScrollTrack');
+  if(list&&track){
+    list.addEventListener('scroll',updateCalFilterScrollbar,{passive:true});
+    window.addEventListener('resize',updateCalFilterScrollbar);
+    track.addEventListener('pointerdown',e=>{
+      if(e.target!==track)return;
+      const rect=track.getBoundingClientRect();
+      const ratio=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));
+      list.scrollTop=ratio*list.scrollHeight-list.clientHeight/2;
+      updateCalFilterScrollbar();
+    });
+  }
   const placeEmptyNotice=open=>{
     const notice=$('#cfNoEvents');
     if(!notice)return;
@@ -3705,6 +3737,7 @@ restoreStaffSession();
     pop.hidden=!open;
     btn.setAttribute('aria-expanded', open?'true':'false');
     placeEmptyNotice(open);
+    if(open)requestAnimationFrame(updateCalFilterScrollbar);
   });
   document.addEventListener('click', e=>{
     if(!wrap.contains(e.target)){

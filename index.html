@@ -3259,18 +3259,11 @@ async function countVisit(){
   if(b) b.textContent='—';
   if(!sb) return;
   const today=seoulDateStr(new Date()); // 모든 기기가 동일하게 한국 표준시 기준으로 집계
-  let counted=false;
-  try{ counted=!!sessionStorage.getItem('klink_v_counted'); }catch(_){}
-  if(!counted){
-    try{
-      sessionStorage.setItem('klink_v_counted','1');
-    }catch(_){}
-    try{
-      const vkey='visit-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
-      const {error}=await sb.from('klink_meta').insert({key:vkey,value:today});
-      if(error)console.warn('방문 기록 저장 실패:',error);
-    }catch(err){ console.warn('방문 기록 저장 실패:',err); }
-  }
+  try{
+    const vkey='visit-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+    const {error}=await sb.from('klink_meta').insert({key:vkey,value:today});
+    if(error)console.warn('방문 기록 저장 실패:',error);
+  }catch(err){ console.warn('방문 기록 저장 실패:',err); }
   try{
     /* 공용 행을 직접 읽어 모든 기기가 같은 누적·당일 수치를 표시합니다. */
     const {data:visitRows,error}=await sb.from('klink_meta')
@@ -3348,7 +3341,7 @@ function setMode(m){
   if(!locked) TABS[m].forEach(([id],i)=>{$('#'+id).hidden=i!==0});
   closeDrawer(); closeQuickpop();
   if(locked){ setTimeout(()=>{const i=$('#lkStaffNo'); if(i){i.focus()}},50); return; }
-  if(m==='staff')drawStaff(); else { drawStudent(); countVisit(); }
+  if(m==='staff')drawStaff(); else drawStudent();
 }
 async function tryUnlock(){
   const staffNo=$('#lkStaffNo').value.trim();
@@ -3754,7 +3747,7 @@ $('#calShowPub').addEventListener('change', e=>{
 });
 $('#noticeSave').addEventListener('click', saveNoticeCfg);
 $('#noticeHistLoad').addEventListener('click', loadNoticeHistSelected);
-drawDeptChips(); drawMemos(); drawKeywords(); initKeywordReorder(); drawNoticeSettings(); setMode('student');
+drawDeptChips(); drawMemos(); drawKeywords(); initKeywordReorder(); drawNoticeSettings(); setMode('student'); countVisit();
 initPublicCloudSync();
 restoreStaffSession();
 

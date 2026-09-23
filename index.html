@@ -1644,9 +1644,9 @@ function applyPublicMeta(metaMap){
       const rows=JSON.parse(metaMap.public_pay_keywords);
       if(Array.isArray(rows)){
         const selectedWords=CAL_FILTER_SEL&&CAL_FILTER_TOUCHED
-          ?new Set(KEYWORDS.filter(k=>CAL_FILTER_SEL.has(k.id)).map(k=>k.word)):null;
-        KEYWORDS=rows.filter(k=>k&&k.id&&k.word).map(k=>({id:String(k.id),word:String(k.word),label:String(k.label||''),kind:k.kind||'pay'}));
-        if(selectedWords)CAL_FILTER_SEL=new Set(KEYWORDS.filter(k=>selectedWords.has(k.word)).map(k=>k.id));
+          ?new Set(PUBLIC_KEYWORDS.filter(k=>CAL_FILTER_SEL.has(k.id)).map(k=>k.word)):null;
+        PUBLIC_KEYWORDS=rows.filter(k=>k&&k.id&&k.word).map(k=>({id:String(k.id),word:String(k.word),label:String(k.label||''),kind:k.kind||'pay'}));
+        if(selectedWords)CAL_FILTER_SEL=new Set(PUBLIC_KEYWORDS.filter(k=>selectedWords.has(k.word)).map(k=>k.id));
       }
     }catch(_){}
   }
@@ -1697,7 +1697,7 @@ async function initStaffCloudSync(){
       await Promise.all(KEYWORDS.map(k=>cloudInsertKeyword(k)));
     }
     if(metaMap.public_pay_keywords)orderKeywordsFromPublicMeta(metaMap.public_pay_keywords);
-    else await persistPublicKeywords();
+    else if(!(await persistPublicKeywords()))toast('학생용 장학 목록을 공용 서버에 동기화하지 못했습니다. 직원용 목록 동기화 상태를 확인해주세요.');
     if(metaMap.exclude_keywords){ try{ EXCLUDE_KEYWORDS=JSON.parse(metaMap.exclude_keywords); }catch(_){} }
     else{ await persistExcludeKeywords(); }
     if(!metaMap.notice_config){ await persistNoticeCfg(); }
@@ -2741,6 +2741,7 @@ function showCsvFallback(csv){
 let KEYWORDS=[
   {id:'K1',word:'국가근로장학',label:'국가근로장학금 지급',kind:'pay'},
   {id:'K2',word:'교내 고정근로',label:'교내 고정근로장학금 지급',kind:'pay'},
+  {id:'K15',word:'국가장학금',label:'국가장학금(1유형/다자녀)지급',kind:'pay'},
   {id:'K3',word:'계명행복우수A',label:'계명행복우수A',kind:'pay'},
   {id:'K4',word:'계명행복우수B',label:'계명행복우수B',kind:'pay'},
   {id:'K5',word:'인문100년장학금 생활비',label:'인문100년장학금 생활비',kind:'pay'},
@@ -2752,10 +2753,10 @@ let KEYWORDS=[
   {id:'K11',word:'총장특별(성적우수)',label:'총장특별(성적우수) 지급',kind:'pay'},
   {id:'K12',word:'총장특별(학업우수)',label:'총장특별(학업우수)',kind:'pay'},
   {id:'K13',word:'주거안정장학금',label:'주거안정장학금 해당월분 지급',kind:'pay'},
-  {id:'K14',word:'자격증 취득 장학금',label:'자격증 취득 장학금 지급',kind:'pay'},
-  {id:'K15',word:'국가장학금',label:'국가장학금(1유형/다자녀)지급',kind:'pay'}
+  {id:'K14',word:'자격증 취득 장학금',label:'자격증 취득 장학금 지급',kind:'pay'}
 ];
 let kwSeq=16;
+let PUBLIC_KEYWORDS=KEYWORDS.map(k=>({...k}));
 
 /* 자동 제외 규칙 — 결의제목에 word가 들어가면 제외하되, except가 있고 그 말도
    들어가 있으면 예외로 두고 제외하지 않습니다 (예: '반환'은 제외하되 '재지급'이
@@ -2779,14 +2780,14 @@ let NOTICE_HISTORY=[]; // 안내 문구를 저장할 때마다 이전 값을 최
    필터 대상이 아니라 항상 그대로 보여줍니다 — 실수로 안 보이게 되는 일이 없도록. */
 function filterKeywordFor(name){
   const base=dedupBaseName(name);
-  return KEYWORDS.find(k=>(k.label && base===k.label) || (k.word && base.includes(k.word))) || null;
+  return PUBLIC_KEYWORDS.find(k=>(k.label && base===k.label) || (k.word && base.includes(k.word))) || null;
 }
 let CAL_FILTER_SEL=null;
 let CAL_FILTER_TOUCHED=false;
 function calFilterOptions(){
   /* 운영자가 표기할 장학 목록에 등록한 키워드를 모두 보여줍니다.
      화면 이름은 결의제목용 표기(label)가 아니라 목록의 장학명(word)을 사용합니다. */
-  return KEYWORDS.map(k=>({id:k.id, name:k.word}));
+  return PUBLIC_KEYWORDS.map(k=>({id:k.id, name:k.word}));
 }
 function orderKeywordsFromPublicMeta(raw){
   try{
@@ -2794,12 +2795,20 @@ function orderKeywordsFromPublicMeta(raw){
     if(!Array.isArray(saved))return;
     const ids=saved.map(k=>typeof k==='string'?k:k&&k.id).filter(Boolean);
     const rank=new Map(ids.map((id,i)=>[String(id),i]));
-    KEYWORDS.sort((a,b)=>(rank.get(String(a.id))??Number.MAX_SAFE_INTEGER)-(rank.get(String(b.id))??Number.MAX_SAFE_INTEGER));
+    PUBLIC_KEYWORDS.sort((a,b)=>(rank.get(String(a.id))??Number.MAX_SAFE_INTEGER)-(rank.get(String(b.id))??Number.MAX_SAFE_INTEGER));
   }catch(_){}
 }
-function persistPublicKeywords(){
+async function persistPublicKeywords(){
   const ordered=KEYWORDS.map(k=>({id:k.id,word:k.word,label:k.label||'',kind:k.kind||'pay'}));
-  return cloudSetMeta('public_pay_keywords',JSON.stringify(ordered));
+  const ok=await cloudSetMeta('public_pay_keywords',JSON.stringify(ordered));
+  if(ok){
+    const selectedWords=CAL_FILTER_SEL&&CAL_FILTER_TOUCHED
+      ?new Set(PUBLIC_KEYWORDS.filter(k=>CAL_FILTER_SEL.has(k.id)).map(k=>k.word)):null;
+    PUBLIC_KEYWORDS=ordered.map(k=>({...k}));
+    if(selectedWords)CAL_FILTER_SEL=new Set(PUBLIC_KEYWORDS.filter(k=>selectedWords.has(k.word)).map(k=>k.id));
+    if(typeof mode!=='undefined'&&mode==='student')drawStudent();
+  }
+  return ok;
 }
 function ensureCalFilterSel(){
   const opts=calFilterOptions();

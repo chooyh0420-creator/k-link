@@ -610,6 +610,7 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .link:hover{border-color:var(--brand)}
 .note{font-size:12.5px; color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line-soft);
   border-left:3px solid var(--brand); border-radius:6px; padding:10px 12px}
+.note a{color:var(--brand); text-decoration:underline; text-underline-offset:2px; overflow-wrap:anywhere}
 
 .field{margin-bottom:12px}
 .field label{display:block; font-size:12.5px; color:var(--ink-2); margin-bottom:5px; font-weight:500}
@@ -1708,14 +1709,13 @@ const byId=id=>TASKS.find(t=>t.id===id), sById=id=>allStudentEvents().find(e=>e.
 const dept=id=>DEPTS.find(d=>d.id===id)||{name:id,color:'#888'};
 const kind=id=>S_KIND.find(k=>k.id===id)||{name:id,color:'#888'};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-/* 안내 문구의 URL은 별도 바로가기 버튼 하나로 모아 보여줍니다. */
+/* 안내 문구는 작성한 내용을 유지하고 URL만 인라인 하이퍼링크로 표시합니다. */
 const firstHttpUrl=s=>{const m=String(s||'').match(/https?:\/\/[^\s<]+/);return m?m[0].replace(/[),.;]+$/,''):''};
-const eventDescriptionHtml=s=>{
-  const raw=String(s||''),hasUrl=/https?:\/\/[^\s<]+/.test(raw);
-  const text=raw.replace(/https?:\/\/[^\s<]+/g,'').replace(/[ \t]+\n/g,'\n').trim();
-  const display=text+(hasUrl?(text?'\n\n':'')+'자세한 내용은 아래 바로가기를 눌러 확인하세요.':'');
-  return esc(display).replace(/\n/g,'<br>');
-};
+const linkifyDesc=s=>esc(s).replace(/(https?:\/\/[^\s<]+)/g,m=>{
+  const url=m.replace(/[),.;]+$/,'');
+  const suffix=m.slice(url.length);
+  return `<a href="${url}" target="_blank" rel="noopener">${url}</a>${suffix}`;
+}).replace(/\n/g,'<br>');
 const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
 const diffDays=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
 /* YYYY-MM-DD 형식이면서 실제로 존재하는 날짜인지 확인 (예: 2027-02-30은 거부) */
@@ -2582,7 +2582,7 @@ function openEvent(id){
       <dt>${e.start===e.end?'일자':'기간'}</dt><dd>${e.start===e.end?e.start:`${e.start} ~ ${e.end}`}</dd>
       <dt>남은 기간</dt><dd>${diffDays(TODAY,e.start)>0?`${diffDays(TODAY,e.start)}일 뒤 시작`:diffDays(TODAY,e.end)>=0?'진행 중':'종료됨'}</dd>
       <dt>문의</dt><dd>${esc(e.where)}</dd></dl>
-    <div class="note">${e.desc?eventDescriptionHtml(e.desc):'등록된 안내 문구가 없습니다.'}</div>
+    <div class="note">${e.desc?linkifyDesc(e.desc):'등록된 안내 문구가 없습니다.'}</div>
     ${shortcutUrl?`<a href="${esc(shortcutUrl)}" target="_blank" rel="noopener" class="btn btn-sm"
       style="display:inline-block;margin-top:14px;text-decoration:none">바로가기 ↗</a>`:''}`;
   $('#drawer').hidden=false;$('#scrim').hidden=false;$('#drClose').focus();

@@ -3350,7 +3350,9 @@ $('#drawer').addEventListener('click',e=>{
     t.publicUrl=$('#pubUrl').value.trim();
     t.publicDesc=$('#pubDesc').value.trim();
     t.isPublic=true;
-    drawDeptRows(); toast('학생 공개 내용을 저장했습니다.');
+    drawDeptRows();
+    closeDrawer();
+    toast('학생 공개 내용을 저장했습니다.');
     return;
   }
   if(e.target.id==='stSave'){

@@ -2126,13 +2126,13 @@ function saveQuick(){
   toast(`"${name}" 업무를 추가했습니다. 부서별 업무·연결 지도에도 함께 등록됩니다.`);
 }
 
-function addTask({name,dept,owner,date,end,flow,calendarEnabled=true,files,criteria}){
+function addTask({name,dept,owner,date,end,flow,calendarEnabled=true,files,criteria,note}){
   const t={id:'N'+(seq++), flow, name, dept, owner:owner||'미지정', date,
     end: end&&end!==date?end:undefined, baseDate:date, status:'예정',
     calendarEnabled,
     prev:[],
     files:files&&files.length?files:['(미등록)'],
-    criteria:criteria&&criteria.length?criteria:[['완료 확인',false]], note:''};
+    criteria:criteria&&criteria.length?criteria:[['완료 확인',false]], note:note||''};
   TASKS.push(t);
   HISTORY.unshift({at:nowKSTMinute(),who:dept?DEPTS.find(d=>d.id===dept).name+' 담당자':'담당자',
     task:t.id, what:`업무 신규 등록 (${date}${t.end?' ~ '+t.end:''})`, why:'담당자 직접 추가'});
@@ -2162,6 +2162,8 @@ function openNewFull(opts){
       <div class="field"><label for="nfDate">시작일</label><input type="date" id="nfDate" value="${start}"></div>
       <div class="field"><label for="nfEnd">종료일</label><input type="date" id="nfEnd" value="${end}"></div>
     </div>
+    <div class="field"><label for="nfNote">참고사항 (선택사항)</label>
+      <textarea id="nfNote" rows="3" placeholder="업무 관련 참고 내용을 자유롭게 적어주세요."></textarea></div>
     <div class="dr-sec">
       <h4>학생 공개</h4>
       <label class="switch">
@@ -2195,7 +2197,7 @@ function saveNewFull(){
   const date=$('#nfDate').value, end=$('#nfEnd').value||date;
   const t=addTask({name, dept:$('#nfDept').value, owner:$('#nfOwner').value.trim(), date, end,
     flow:FLOWS[0]&&FLOWS[0].id,
-    files:[], criteria:[]});
+    files:[], criteria:[], note:$('#nfNote').value.trim()});
   const pubOn=$('#nfPubOn'), isPub=!!(pubOn&&pubOn.checked);
   if(isPub){
     t.isPublic=true;

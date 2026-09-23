@@ -412,11 +412,11 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .wk-grid button:last-child{border-right:0}
 .wk-grid button.off{background:var(--surface-2)}
 .wk-grid button.istoday{background:var(--brand-soft)}
-.wk-grid button:hover{background:color-mix(in srgb, var(--brand) 8%, transparent)}
+.wk-grid button[data-newday]:hover{background:color-mix(in srgb, var(--brand) 8%, transparent)}
 .wk-grid button.drop-target{background:color-mix(in srgb, var(--brand) 18%, transparent); box-shadow:inset 0 0 0 2px var(--brand)}
 .wk-grid button.sel{background:color-mix(in srgb, var(--brand) 16%, transparent)}
 .wk-grid button.sel::after{display:none}
-.wk-grid button:hover::after{content:attr(data-addlabel); position:absolute; left:7px; bottom:7px;
+.wk-grid button[data-newday]:hover::after{content:attr(data-addlabel); position:absolute; left:7px; bottom:7px;
   font-size:11px; font-weight:700; color:var(--brand);
   background:var(--surface); border:1px solid var(--brand); border-radius:5px; padding:2px 8px}
 .wk-grid button:focus-visible{outline:2px solid var(--brand); outline-offset:-2px}

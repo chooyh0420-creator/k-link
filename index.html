@@ -610,7 +610,8 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .link:hover{border-color:var(--brand)}
 .note{font-size:12.5px; color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line-soft);
   border-left:3px solid var(--brand); border-radius:6px; padding:10px 12px}
-.note a{color:var(--brand); text-decoration:underline; word-break:break-all}
+.note a{display:inline-block; color:var(--brand); text-decoration:none; white-space:nowrap;
+  font-weight:700; background:var(--brand-soft); border-radius:5px; padding:2px 8px}
 
 .field{margin-bottom:12px}
 .field label{display:block; font-size:12.5px; color:var(--ink-2); margin-bottom:5px; font-weight:500}
@@ -1712,7 +1713,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 /* 안내 문구 안에 그냥 텍스트로 적어둔 http(s):// 링크를 자동으로 눌러서 이동할 수
    있는 링크로 바꿔줍니다. 줄바꿈도 그대로 살려서 여러 장학금·링크를 한 줄씩 적어도
    보기 좋게 표시됩니다. */
-const linkifyDesc=s=>esc(s).replace(/(https?:\/\/[^\s<]+)/g,m=>`<a href="${m}" target="_blank" rel="noopener">${m}</a>`).replace(/\n/g,'<br>');
+const linkifyDesc=s=>esc(s).replace(/(https?:\/\/[^\s<]+)/g,m=>`<a href="${m}" target="_blank" rel="noopener">바로가기 ↗</a>`).replace(/\n/g,'<br>');
 const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
 const diffDays=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
 /* YYYY-MM-DD 형식이면서 실제로 존재하는 날짜인지 확인 (예: 2027-02-30은 거부) */

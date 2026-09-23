@@ -243,6 +243,11 @@ h1,h2,h3,h4{margin:0; font-weight:700; line-height:1.35}
 .kwlist .kwempty{padding:16px 14px; font-size:12px; color:var(--ink-3); text-align:center; background:var(--surface-2)}
 .kw{display:flex; align-items:center; gap:10px; background:var(--surface);
   border-bottom:1px solid var(--line-soft); padding:9px 14px; font-size:12.5px}
+.kw[draggable="true"]{cursor:grab;touch-action:pan-y}
+.kw.dragging{opacity:.45}
+.kw.drag-before{box-shadow:inset 0 3px var(--brand)}
+.kw.drag-after{box-shadow:inset 0 -3px var(--brand)}
+.kw .kw-grip{flex:none;color:var(--ink-3);font-size:16px;cursor:grab;user-select:none}
 .kw:last-child{border-bottom:0}
 .kw b{font-weight:700; color:var(--ink); flex:none; min-width:150px; max-width:220px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
@@ -1020,7 +1025,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 
     <div class="step">
       <div class="step-h"><span class="step-n">1</span><h3>표기할 장학 목록</h3>
-        <span class="sub">여기에 등록해둔 키워드와 일치하는 결의만 아래 미리보기에 나타납니다. (등록되지 않은 결의는 표시·저장되지 않습니다)</span></div>
+        <span class="sub">여기에 등록해둔 키워드와 일치하는 결의만 아래 미리보기에 나타납니다. 순서는 항목을 드래그해 바꿀 수 있고 학생용 필터에도 반영됩니다. (등록되지 않은 결의는 표시·저장되지 않습니다)</span></div>
       <div class="kwlist" id="kwList"></div>
       <div class="kwform">
         <div class="field"><label for="kwWord">결의제목에 들어가는 말</label>
@@ -1594,7 +1599,7 @@ function persistHiddenIds(){
   return cloudSetMeta('hidden_event_ids', JSON.stringify([...HIDDEN_IDS]));
 }
 /* 학생 화면은 공개 일정·안내만, 직원 화면은 로그인 뒤에만 업무 원문을 읽습니다. */
-const PUBLIC_META_KEYS=['notice_config','pay_updated_at','hidden_event_ids','public_task_events'];
+const PUBLIC_META_KEYS=['notice_config','pay_updated_at','hidden_event_ids','public_task_events','public_pay_keywords'];
 function metaRowsToMap(rows){
   const out={}; (rows||[]).forEach(r=>{ out[r.key]=r.value; }); return out;
 }
@@ -1614,6 +1619,12 @@ function applyPublicMeta(metaMap){
   if(metaMap.hidden_event_ids){ try{ HIDDEN_IDS=new Set(JSON.parse(metaMap.hidden_event_ids)); }catch(_){} }
   if(metaMap.notice_config){ try{ NOTICE_CFG=Object.assign({},NOTICE_CFG,JSON.parse(metaMap.notice_config)); }catch(_){} }
   if(metaMap.public_task_events){ try{ PUBLIC_TASK_EVENTS=JSON.parse(metaMap.public_task_events)||[]; }catch(_){ PUBLIC_TASK_EVENTS=[]; } }
+  if(metaMap.public_pay_keywords){
+    try{
+      const rows=JSON.parse(metaMap.public_pay_keywords);
+      if(Array.isArray(rows))KEYWORDS=rows.filter(k=>k&&k.id&&k.word).map(k=>({id:String(k.id),word:String(k.word),label:String(k.label||''),kind:k.kind||'pay'}));
+    }catch(_){}
+  }
 }
 function redrawCloudViews(){
   drawKeywords(); drawExcludeKeywords(); drawImportedList(); drawUploadHistory(); drawMemos(); drawNoticeSettings();
@@ -1660,6 +1671,8 @@ async function initStaffCloudSync(){
     }else{
       await Promise.all(KEYWORDS.map(k=>cloudInsertKeyword(k)));
     }
+    if(metaMap.public_pay_keywords)orderKeywordsFromPublicMeta(metaMap.public_pay_keywords);
+    else await persistPublicKeywords();
     if(metaMap.exclude_keywords){ try{ EXCLUDE_KEYWORDS=JSON.parse(metaMap.exclude_keywords); }catch(_){} }
     else{ await persistExcludeKeywords(); }
     if(!metaMap.notice_config){ await persistNoticeCfg(); }
@@ -2737,6 +2750,19 @@ function calFilterOptions(){
      화면 이름은 결의제목용 표기(label)가 아니라 목록의 장학명(word)을 사용합니다. */
   return KEYWORDS.map(k=>({id:k.id, name:k.word}));
 }
+function orderKeywordsFromPublicMeta(raw){
+  try{
+    const saved=typeof raw==='string'?JSON.parse(raw):raw;
+    if(!Array.isArray(saved))return;
+    const ids=saved.map(k=>typeof k==='string'?k:k&&k.id).filter(Boolean);
+    const rank=new Map(ids.map((id,i)=>[String(id),i]));
+    KEYWORDS.sort((a,b)=>(rank.get(String(a.id))??Number.MAX_SAFE_INTEGER)-(rank.get(String(b.id))??Number.MAX_SAFE_INTEGER));
+  }catch(_){}
+}
+function persistPublicKeywords(){
+  const ordered=KEYWORDS.map(k=>({id:k.id,word:k.word,label:k.label||'',kind:k.kind||'pay'}));
+  return cloudSetMeta('public_pay_keywords',JSON.stringify(ordered));
+}
 function ensureCalFilterSel(){
   const opts=calFilterOptions();
   if(CAL_FILTER_SEL){
@@ -2746,7 +2772,7 @@ function ensureCalFilterSel(){
     return CAL_FILTER_SEL;
   }
   try{
-    const raw=localStorage.getItem('klink_cal_filter_sel');
+    const raw=localStorage.getItem('klink_cal_filter_sel_v2');
     if(raw){ CAL_FILTER_SEL=new Set(JSON.parse(raw)); CAL_FILTER_TOUCHED=true; return CAL_FILTER_SEL; }
   }catch(_){}
   CAL_FILTER_SEL=new Set(opts.map(o=>o.id)); // 기본값 = 전체
@@ -2755,7 +2781,7 @@ function ensureCalFilterSel(){
 let CAL_FILTER_TOUCHED=false;
 function saveCalFilterSel(){
   CAL_FILTER_TOUCHED=true;
-  try{ localStorage.setItem('klink_cal_filter_sel', JSON.stringify([...CAL_FILTER_SEL])); }catch(_){}
+  try{ localStorage.setItem('klink_cal_filter_sel_v2', JSON.stringify([...CAL_FILTER_SEL])); }catch(_){}
 }
 function nameFilterPass(e){
   const k=filterKeywordFor(e.name);
@@ -2796,7 +2822,8 @@ function drawCalFilterEmptyNotice(){
 
 function drawKeywords(){
   $('#kwList').innerHTML = KEYWORDS.length ? KEYWORDS.map(k=>`
-    <div class="kw">
+    <div class="kw" data-kwrow="${esc(k.id)}" draggable="true">
+      <span class="kw-grip" aria-hidden="true" title="드래그하여 순서 변경">⠿</span>
       <b>${esc(k.word)}</b>
       ${k.label?`<span class="arrow">→</span><span class="as">${esc(k.label)}</span>`:'<span class="as">→ 결의제목 그대로 표시</span>'}
       <span class="kind-tag">${esc(kind(k.kind).name)}</span>
@@ -2813,10 +2840,44 @@ function addKeyword(){
   if(!w){ toast('결의제목에 들어가는 말을 입력해주세요.'); $('#kwWord').focus(); return; }
   const k={id:'K'+(kwSeq++), word:w, label:$('#kwLabel').value.trim(), kind:$('#kwKind').value};
   KEYWORDS.push(k);
-  cloudInsertKeyword(k);
+  cloudInsertKeyword(k).then(ok=>{
+    if(ok)persistPublicKeywords();
+    else toast('장학 목록은 화면에 추가했지만 서버 저장에 실패했습니다.');
+  });
   $('#kwWord').value=''; $('#kwLabel').value='';
   drawKeywords();
   toast(`"${w}" 장학을 목록에 추가했습니다. 다음에 파일을 넣을 때부터 적용됩니다.`);
+}
+function initKeywordReorder(){
+  const list=$('#kwList'); if(!list)return;
+  let dragged=null;
+  list.addEventListener('dragstart',e=>{
+    const row=e.target.closest('[data-kwrow]'); if(!row)return;
+    dragged=row; row.classList.add('dragging');
+    if(e.dataTransfer){e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',row.dataset.kwrow);}
+  });
+  list.addEventListener('dragover',e=>{
+    const target=e.target.closest('[data-kwrow]'); if(!dragged||!target||target===dragged)return;
+    e.preventDefault();
+    list.querySelectorAll('.drag-before,.drag-after').forEach(row=>row.classList.remove('drag-before','drag-after'));
+    target.classList.add(e.clientY<target.getBoundingClientRect().top+target.offsetHeight/2?'drag-before':'drag-after');
+  });
+  list.addEventListener('drop',e=>{
+    const target=e.target.closest('[data-kwrow]'); if(!dragged||!target)return;
+    e.preventDefault();
+    if(target!==dragged){
+      const after=e.clientY>=target.getBoundingClientRect().top+target.offsetHeight/2;
+      list.insertBefore(dragged,after?target.nextSibling:target);
+      const rank=new Map([...list.querySelectorAll('[data-kwrow]')].map((row,i)=>[row.dataset.kwrow,i]));
+      KEYWORDS.sort((a,b)=>rank.get(a.id)-rank.get(b.id));
+      drawKeywords();
+      persistPublicKeywords().then(ok=>toast(ok?'장학 목록 순서를 저장했습니다.':'순서는 바뀌었지만 서버 저장에 실패했습니다. 다시 로그인한 뒤 확인해주세요.'));
+    }
+  });
+  list.addEventListener('dragend',()=>{
+    dragged=null;
+    list.querySelectorAll('.dragging,.drag-before,.drag-after').forEach(row=>row.classList.remove('dragging','drag-before','drag-after'));
+  });
 }
 
 function drawExcludeKeywords(){
@@ -3318,7 +3379,9 @@ document.addEventListener('click',e=>{
   if(e.target.id==='printBtn'){window.print();return}
   /* 지급일 가져오기 */
   const kd=e.target.closest('[data-kwdel]');
-  if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId); drawKeywords();
+  if(kd){ const delId=kd.dataset.kwdel; KEYWORDS=KEYWORDS.filter(k=>k.id!==delId); cloudDeleteKeyword(delId).then(ok=>{
+      if(ok)persistPublicKeywords(); else toast('장학 목록을 서버에서 삭제하지 못했습니다.');
+    }); drawKeywords();
     return; }
   if(e.target.id==='kwAdd'){addKeyword();return}
   const exd=e.target.closest('[data-exdel]');
@@ -3612,7 +3675,7 @@ $('#calShowPub').addEventListener('change', e=>{
 });
 $('#noticeSave').addEventListener('click', saveNoticeCfg);
 $('#noticeHistLoad').addEventListener('click', loadNoticeHistSelected);
-drawDeptChips(); drawMemos(); drawKeywords(); drawNoticeSettings(); setMode('student');
+drawDeptChips(); drawMemos(); drawKeywords(); initKeywordReorder(); drawNoticeSettings(); setMode('student');
 initPublicCloudSync();
 restoreStaffSession();
 

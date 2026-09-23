@@ -1045,6 +1045,10 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
           <button class="mini" id="importCancel">취소</button>
         </div>
       </div>
+      <div id="uploadHistory" class="hint" style="margin-top:10px">
+        <b style="display:block;margin-bottom:8px">업로드 이력</b>
+        <div id="uploadHistoryList"></div>
+      </div>
     </div>
 
     <div class="step" id="previewStep">
@@ -1202,6 +1206,8 @@ const S_KIND=[
 ];
 /* 학생용 캘린더에 지급일 자료를 마지막으로 올린 시점(자료 신뢰도 표시용) */
 let PAY_UPDATED_AT=null;
+let PAY_UPLOAD_HISTORY=[];
+let NEW_IMPORT_IDS=new Set();
 try{ PAY_UPDATED_AT = localStorage.getItem('klink_pay_updated_at'); }catch(_){}
 function markPayUpdated(){
   PAY_UPDATED_AT = new Date().toISOString();
@@ -1284,6 +1290,9 @@ async function cloudSetMeta(key, value){
   try{ const {error}=await sb.from('klink_meta').upsert({key, value});
     if(error) throw error; return true; }
   catch(err){ console.warn('클라우드 저장 실패(메타):', err); return false; }
+}
+function persistPayUploadHistory(){
+  return cloudSetMeta('pay_upload_history', JSON.stringify(PAY_UPLOAD_HISTORY.slice(0,30)));
 }
 function persistExcludeKeywords(){
   return cloudSetMeta('exclude_keywords', JSON.stringify(EXCLUDE_KEYWORDS));
@@ -1585,7 +1594,7 @@ function applyPublicMeta(metaMap){
   if(metaMap.public_task_events){ try{ PUBLIC_TASK_EVENTS=JSON.parse(metaMap.public_task_events)||[]; }catch(_){ PUBLIC_TASK_EVENTS=[]; } }
 }
 function redrawCloudViews(){
-  drawKeywords(); drawExcludeKeywords(); drawImportedList(); drawMemos(); drawNoticeSettings();
+  drawKeywords(); drawExcludeKeywords(); drawImportedList(); drawUploadHistory(); drawMemos(); drawNoticeSettings();
   if(mode==='student') drawStudent(); else if(mode==='staff' && hasStaffSession()) drawStaff();
 }
 async function initPublicCloudSync(){
@@ -1633,6 +1642,12 @@ async function initStaffCloudSync(){
     else{ await persistExcludeKeywords(); }
     if(!metaMap.notice_config){ await persistNoticeCfg(); }
     if(metaMap.notice_config_history){ try{ NOTICE_HISTORY=JSON.parse(metaMap.notice_config_history)||[]; }catch(_){ NOTICE_HISTORY=[]; } }
+    if(metaMap.pay_upload_history){
+      try{
+        PAY_UPLOAD_HISTORY=JSON.parse(metaMap.pay_upload_history)||[];
+        NEW_IMPORT_IDS=new Set((PAY_UPLOAD_HISTORY[0]&&PAY_UPLOAD_HISTORY[0].newEventIds)||[]);
+      }catch(_){ PAY_UPLOAD_HISTORY=[]; NEW_IMPORT_IDS=new Set(); }
+    }
     if(Object.prototype.hasOwnProperty.call(metaMap,'staff_data_version')){
       STAFF_VERSION_RAW=metaMap.staff_data_version; STAFF_VERSION_STATE=parseStaffVersionState(STAFF_VERSION_RAW);
     }
@@ -2433,7 +2448,8 @@ function deleteImportedEvent(id){
 }
 const studentEvents=()=>{
   return filteredStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter)
-    .map(e=>({id:e.id,name:e.name,start:e.start,end:e.end,color:kind(e.kind).color,src:'sev'}));
+    .map(e=>({id:e.id,name:e.name,start:e.start,end:e.end,
+      color:NEW_IMPORT_IDS.has(e.id)?'#2563EB':kind(e.kind).color,src:'sev'}));
 };
 function drawStudent(){
   drawHintMarquee();
@@ -2830,9 +2846,23 @@ function clearImportCheck(){
 }
 function confirmImport(){
   if(!PENDING_IMPORT) return;
-  const added=autoImportMatched(PENDING_IMPORT.matched);
+  const addedEvents=autoImportMatched(PENDING_IMPORT.matched);
   markPayUpdated();
-  const n=added.length;
+  const n=addedEvents.length;
+  NEW_IMPORT_IDS=new Set(addedEvents.map(e=>e.id));
+  const history={
+    id:'UP'+Date.now(), at:new Date().toISOString(),
+    fileName:$('#fileName').textContent||'(파일명 없음)',
+    totalRows:PENDING_IMPORT.totalRows, payRows:PENDING_IMPORT.payRows,
+    excludedRows:PENDING_IMPORT.excludedRows, matchedCount:PENDING_IMPORT.matched.length,
+    newCount:n, duplicateCount:PENDING_IMPORT.plan.duplicate.length,
+    errorRows:PENDING_IMPORT.errorRows, newEventIds:addedEvents.map(e=>e.id)
+  };
+  PAY_UPLOAD_HISTORY=[history,...PAY_UPLOAD_HISTORY].slice(0,30);
+  persistPayUploadHistory();
+  drawUploadHistory();
+  drawImportedList();
+  drawStudent();
   PENDING_IMPORT=null;
   $('#importConfirm').disabled=true;
   $('#importConfirm').textContent='저장 완료';
@@ -2901,23 +2931,40 @@ function buildPreview(grid){
      그 개수만큼은 이미 반영된 것으로 보고 넘어갑니다. */
 function autoImportMatched(matched){
   const toAdd=importPlan(matched).toAdd;
+  let newEvents=[];
   if(toAdd.length){
-    const newEvents=toAdd.map(r=>({id:'SN'+(sSeq++), kind:r.kind, name:r.label, start:r.date, end:r.date,
+    newEvents=toAdd.map(r=>({id:'SN'+(sSeq++), kind:r.kind, name:r.label, start:r.date, end:r.date,
       desc:'', where:'장학복지팀', url:'', source:'import', srcTitle:r.title, amount:r.amount}));
     S_EVENTS.push(...newEvents);
     cloudInsertEvents(newEvents);
     drawStudent();
   }
   drawImportedList();
-  return toAdd;
+  return newEvents||[];
+}
+function drawUploadHistory(){
+  const el=$('#uploadHistoryList'); if(!el) return;
+  if(!PAY_UPLOAD_HISTORY.length){
+    el.innerHTML='<span style="color:var(--ink-3)">아직 업로드 이력이 없습니다.</span>'; return;
+  }
+  el.innerHTML=`<div style="display:grid;gap:6px">${PAY_UPLOAD_HISTORY.map(h=>{
+    let when=h.at||'';
+    try{when=new Date(h.at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false});}catch(_){ }
+    const blue=h.newCount>0?'color:#2563EB;font-weight:800':'';
+    return `<div style="border-top:1px solid var(--line);padding:8px 0;font-size:12px">
+      <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><b>${esc(when)}</b><span>${esc(h.fileName||'파일명 없음')}</span></div>
+      <div style="margin-top:3px">전체 ${h.totalRows||0}건 · 지출 ${h.payRows||0}건 · 키워드 일치 ${h.matchedCount||0}건 · 중복 ${h.duplicateCount||0}건 · 오류 ${h.errorRows||0}건</div>
+      <div style="margin-top:3px;${blue}">신규 업데이트 ${h.newCount||0}건${h.newCount?'  ← 새 전표번호':''}</div>
+    </div>`;
+  }).join('')}</div>`;
 }
 function drawImportedList(){
   if($('#manDate') && !$('#manDate').value) $('#manDate').value=TODAY;
   const rows=importedEvents();
   $('#prevRows').innerHTML = rows.length ? rows.map(r=>`
-    <tr>
+    <tr${NEW_IMPORT_IDS.has(r.id)?' style="background:#EFF6FF;border-left:4px solid #2563EB"':''}>
       <td class="num">${r.start}</td>
-      <td>${esc(r.name)}</td>
+      <td>${esc(r.name)}${NEW_IMPORT_IDS.has(r.id)?' <b style="color:#2563EB;font-size:11px">신규</b>':''}</td>
       <td style="font-size:11.5px;color:var(--ink-3)">${esc(r.srcTitle||(r.source==='manual'?'(수기 입력)':''))}</td>
       <td style="font-size:11.5px"><select class="imp-kind-sel" data-impkind="${r.id}">${S_KIND.map(k=>`<option value="${k.id}" ${k.id===r.kind?'selected':''}>${esc(k.name)}</option>`).join('')}</select></td>
       <td class="num">${esc(r.amount||'')}</td>
@@ -3178,7 +3225,6 @@ document.addEventListener('click',e=>{
   if(exd){ const delId=exd.dataset.exdel; EXCLUDE_KEYWORDS=EXCLUDE_KEYWORDS.filter(x=>x.id!==delId); persistExcludeKeywords(); drawExcludeKeywords();
     return; }
   if(e.target.id==='exAdd'){addExcludeKeyword();return}
-  if(e.target.id==='filePick'){$('#fileInput').click();return}
   if(e.target.id==='importConfirm'){confirmImport();return}
   if(e.target.id==='importCancel'){clearImportCheck();return}
   const di=e.target.closest('[data-delimp]');
@@ -3417,6 +3463,8 @@ function setTheme(t){
 /* 파일 끌어다 놓기 */
 (function(){
   const box=$('#fileBox'); if(!box) return;
+  const pick=$('#filePick'), input=$('#fileInput');
+  if(pick&&input) pick.addEventListener('click',e=>{e.preventDefault();input.value='';input.click();});
   ['dragenter','dragover'].forEach(t=>box.addEventListener(t,e=>{e.preventDefault();box.classList.add('drag')}));
   ['dragleave','drop'].forEach(t=>box.addEventListener(t,e=>{e.preventDefault();box.classList.remove('drag')}));
   box.addEventListener('drop',e=>{

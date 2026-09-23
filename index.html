@@ -1635,7 +1635,12 @@ function applyPublicMeta(metaMap){
   if(metaMap.public_pay_keywords){
     try{
       const rows=JSON.parse(metaMap.public_pay_keywords);
-      if(Array.isArray(rows))KEYWORDS=rows.filter(k=>k&&k.id&&k.word).map(k=>({id:String(k.id),word:String(k.word),label:String(k.label||''),kind:k.kind||'pay'}));
+      if(Array.isArray(rows)){
+        const selectedWords=CAL_FILTER_SEL&&CAL_FILTER_TOUCHED
+          ?new Set(KEYWORDS.filter(k=>CAL_FILTER_SEL.has(k.id)).map(k=>k.word)):null;
+        KEYWORDS=rows.filter(k=>k&&k.id&&k.word).map(k=>({id:String(k.id),word:String(k.word),label:String(k.label||''),kind:k.kind||'pay'}));
+        if(selectedWords)CAL_FILTER_SEL=new Set(KEYWORDS.filter(k=>selectedWords.has(k.word)).map(k=>k.id));
+      }
     }catch(_){}
   }
 }
@@ -2727,11 +2732,23 @@ function showCsvFallback(csv){
    결의서 엑셀의 '전표번호'(예: 20260921-000015) 앞 8자리를 지급 예정일로 읽습니다.
    등록해둔 장학 키워드와 결의제목이 맞으면 자동으로 체크됩니다. */
 let KEYWORDS=[
-  {id:'K1', word:'영풍문화재단', label:'영풍문화재단 장학금 지급', kind:'pay'},
-  {id:'K2', word:'국가근로장학', label:'국가근로장학금 지급', kind:'pay'},
-  {id:'K3', word:'교내 고정근로', label:'교내 고정근로장학금 지급', kind:'pay'}
+  {id:'K1',word:'국가근로장학',label:'국가근로장학금 지급',kind:'pay'},
+  {id:'K2',word:'교내 고정근로',label:'교내 고정근로장학금 지급',kind:'pay'},
+  {id:'K3',word:'계명행복우수A',label:'계명행복우수A',kind:'pay'},
+  {id:'K4',word:'계명행복우수B',label:'계명행복우수B',kind:'pay'},
+  {id:'K5',word:'인문100년장학금 생활비',label:'인문100년장학금 생활비',kind:'pay'},
+  {id:'K6',word:'예술체육비전장학금 생활비',label:'예술체육비전장학금 생활비',kind:'pay'},
+  {id:'K7',word:'중소기업취업연계 취창업지원금',label:'중소기업취업연계 취창업지원금',kind:'pay'},
+  {id:'K8',word:'교내 다자녀(2자녀, 3자녀)장학금',label:'교내 다자녀 장학금 지급',kind:'pay'},
+  {id:'K9',word:'목사자녀장학',label:'목사자녀장학금 지급',kind:'pay'},
+  {id:'K10',word:'학장추천특별장학금',label:'학장추천특별장학금 지급',kind:'pay'},
+  {id:'K11',word:'총장특별(성적우수)',label:'총장특별(성적우수) 지급',kind:'pay'},
+  {id:'K12',word:'총장특별(학업우수)',label:'총장특별(학업우수)',kind:'pay'},
+  {id:'K13',word:'주거안정장학금',label:'주거안정장학금 해당월분 지급',kind:'pay'},
+  {id:'K14',word:'자격증 취득 장학금',label:'자격증 취득 장학금 지급',kind:'pay'},
+  {id:'K15',word:'국가장학금',label:'국가장학금(1유형/다자녀)지급',kind:'pay'}
 ];
-let kwSeq=10;
+let kwSeq=16;
 
 /* 자동 제외 규칙 — 결의제목에 word가 들어가면 제외하되, except가 있고 그 말도
    들어가 있으면 예외로 두고 제외하지 않습니다 (예: '반환'은 제외하되 '재지급'이
@@ -2758,6 +2775,7 @@ function filterKeywordFor(name){
   return KEYWORDS.find(k=>(k.label && base===k.label) || (k.word && base.includes(k.word))) || null;
 }
 let CAL_FILTER_SEL=null;
+let CAL_FILTER_TOUCHED=false;
 function calFilterOptions(){
   /* 운영자가 표기할 장학 목록에 등록한 키워드를 모두 보여줍니다.
      화면 이름은 결의제목용 표기(label)가 아니라 목록의 장학명(word)을 사용합니다. */
@@ -2779,22 +2797,15 @@ function persistPublicKeywords(){
 function ensureCalFilterSel(){
   const opts=calFilterOptions();
   if(CAL_FILTER_SEL){
-    // 새로 생긴 장학 키워드도 자동으로 전체 선택에 포함시킵니다.
-    let changed=false;
-    opts.forEach(o=>{ if(!CAL_FILTER_SEL.has(o.id) && !CAL_FILTER_TOUCHED) { CAL_FILTER_SEL.add(o.id); changed=true; } });
+    // 공용 목록 동기화 후에도 사용자가 선택하지 않은 신규 항목은 기본 전체에 포함합니다.
+    opts.forEach(o=>{ if(!CAL_FILTER_SEL.has(o.id) && !CAL_FILTER_TOUCHED) CAL_FILTER_SEL.add(o.id); });
     return CAL_FILTER_SEL;
   }
-  try{
-    const raw=localStorage.getItem('klink_cal_filter_sel_v2');
-    if(raw){ CAL_FILTER_SEL=new Set(JSON.parse(raw)); CAL_FILTER_TOUCHED=true; return CAL_FILTER_SEL; }
-  }catch(_){}
   CAL_FILTER_SEL=new Set(opts.map(o=>o.id)); // 기본값 = 전체
   return CAL_FILTER_SEL;
 }
-let CAL_FILTER_TOUCHED=false;
 function saveCalFilterSel(){
   CAL_FILTER_TOUCHED=true;
-  try{ localStorage.setItem('klink_cal_filter_sel_v2', JSON.stringify([...CAL_FILTER_SEL])); }catch(_){}
 }
 function nameFilterPass(e){
   const k=filterKeywordFor(e.name);
@@ -3167,60 +3178,45 @@ function addManualEvent(){
 }
 
 /* ===== 모드 · 탭 ===== */
-/* 방문 현황 — 예전에는 이 브라우저의 localStorage에만 저장해서, 기기(PC/모바일)마다
-   숫자가 따로 놀고 TOTAL도 실제 방문 수보다 훨씬 적게 보이는 문제가 있었습니다.
-   이제는 klink_meta 테이블에 방문 1건당 'visit-<시각>-<난수>' 형태의 행을 하나씩
-   추가(insert)하고, TOTAL/TODAY는 그 행 개수를 세어(count) 계산합니다. 값 하나를
-   읽어서 +1 하고 다시 쓰는 방식이 아니라 매번 새 행을 추가하는 방식이라, 여러 사람이
-   동시에 접속해도 방문 기록이 서로 덮어써지지 않고, 모든 기기·모든 방문자가 같은
-   숫자를 보게 됩니다. (Supabase 연결이 안 되면 예전처럼 이 브라우저 기준으로만 대략
-   보여줍니다.) */
-function localDateStr(d){
-  const p=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+/* 방문 집계는 공용 서버 값만 표시합니다. 연결이 안 되면 기기별 임의 숫자 대신 —를 보여줍니다. */
+function seoulDateStr(d=new Date()){
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);
+  const values=Object.fromEntries(parts.filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 async function countVisit(){
-  const today=localDateStr(new Date()); // 접속 기기의 로컬 날짜 기준(=캘린더 '오늘'과 동일 기준)
+  const a=$('#visitTotal'), b=$('#visitToday');
+  if(a) a.textContent='—';
+  if(b) b.textContent='—';
+  if(!sb) return;
+  const today=seoulDateStr(new Date()); // 모든 기기가 동일하게 한국 표준시 기준으로 집계
   let counted=false;
   try{ counted=!!sessionStorage.getItem('klink_v_counted'); }catch(_){}
-  let total=null, day=null;
-  if(sb){
+  if(!counted){
     try{
-      if(!counted){
-        const vkey='visit-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
-        const {error}=await sb.from('klink_meta').insert({key:vkey, value:today});
-        if(error) throw error;
-        try{ sessionStorage.setItem('klink_v_counted','1'); }catch(_){}
-      }
-      /* head/count 응답은 환경에 따라 캐시·행 제한의 영향을 받아
-         실제 누적보다 작게 보일 수 있어, 방문 행을 직접 읽어 계산합니다. */
-      const {data:visitRows,error}=await sb.from('klink_meta')
-        .select('key,value').like('key','visit-%').limit(10000);
-      if(error) throw error;
-      const rows=visitRows||[];
-      total=rows.length;
-      day=rows.filter(r=>r.value===today).length;
-    }catch(err){
-      console.warn('방문 집계(클라우드) 실패, 이 브라우저 기준으로만 표시합니다:', err);
-      total=null; day=null;
-    }
-  }
-  if(total===null){
+      sessionStorage.setItem('klink_v_counted','1');
+    }catch(_){}
     try{
-      total=parseInt(localStorage.getItem('klink_v_total')||'0',10)||0;
-      const savedDay=localStorage.getItem('klink_v_date');
-      day=(savedDay===today)?(parseInt(localStorage.getItem('klink_v_day')||'0',10)||0):0;
-      if(!counted){
-        total+=1; day+=1;
-        localStorage.setItem('klink_v_total',String(total));
-        localStorage.setItem('klink_v_day',String(day));
-        localStorage.setItem('klink_v_date',today);
-      }
-    }catch(_){ total=total||1; day=day||1; }
+      const vkey='visit-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+      const {error}=await sb.from('klink_meta').insert({key:vkey,value:today});
+      if(error)console.warn('방문 기록 저장 실패:',error);
+    }catch(err){ console.warn('방문 기록 저장 실패:',err); }
   }
-  const a=$('#visitTotal'), b=$('#visitToday');
-  if(a) a.textContent=total.toLocaleString();
-  if(b) b.textContent=day.toLocaleString();
+  try{
+    /* 공용 행을 직접 읽어 모든 기기가 같은 누적·당일 수치를 표시합니다. */
+    const {data:visitRows,error}=await sb.from('klink_meta')
+      .select('key,value').like('key','visit-%').limit(10000);
+    if(error)throw error;
+    const rows=visitRows||[];
+    const total=rows.length;
+    const day=rows.filter(r=>r.value===today).length;
+    if(a)a.textContent=total.toLocaleString();
+    if(b)b.textContent=day.toLocaleString();
+  }catch(err){
+    console.warn('공용 방문 집계 조회 실패:',err);
+    if(a)a.textContent='—';
+    if(b)b.textContent='—';
+  }
 }
 
 /* 화면에는 사번만 입력하지만, 서버에는 사번에서 만든 내부 로그인 주소로 비밀번호를 검증합니다.

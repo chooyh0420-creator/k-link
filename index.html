@@ -610,8 +610,6 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .link:hover{border-color:var(--brand)}
 .note{font-size:12.5px; color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line-soft);
   border-left:3px solid var(--brand); border-radius:6px; padding:10px 12px}
-.note a{display:inline-block; color:var(--brand); text-decoration:none; white-space:nowrap;
-  font-weight:700; background:var(--brand-soft); border-radius:5px; padding:2px 8px}
 
 .field{margin-bottom:12px}
 .field label{display:block; font-size:12.5px; color:var(--ink-2); margin-bottom:5px; font-weight:500}
@@ -1710,10 +1708,14 @@ const byId=id=>TASKS.find(t=>t.id===id), sById=id=>allStudentEvents().find(e=>e.
 const dept=id=>DEPTS.find(d=>d.id===id)||{name:id,color:'#888'};
 const kind=id=>S_KIND.find(k=>k.id===id)||{name:id,color:'#888'};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-/* 안내 문구 안에 그냥 텍스트로 적어둔 http(s):// 링크를 자동으로 눌러서 이동할 수
-   있는 링크로 바꿔줍니다. 줄바꿈도 그대로 살려서 여러 장학금·링크를 한 줄씩 적어도
-   보기 좋게 표시됩니다. */
-const linkifyDesc=s=>esc(s).replace(/(https?:\/\/[^\s<]+)/g,m=>`<a href="${m}" target="_blank" rel="noopener">바로가기 ↗</a>`).replace(/\n/g,'<br>');
+/* 안내 문구의 URL은 별도 바로가기 버튼 하나로 모아 보여줍니다. */
+const firstHttpUrl=s=>{const m=String(s||'').match(/https?:\/\/[^\s<]+/);return m?m[0].replace(/[),.;]+$/,''):''};
+const eventDescriptionHtml=s=>{
+  const raw=String(s||''),hasUrl=/https?:\/\/[^\s<]+/.test(raw);
+  const text=raw.replace(/https?:\/\/[^\s<]+/g,'').replace(/[ \t]+\n/g,'\n').trim();
+  const display=text+(hasUrl?(text?'\n\n':'')+'자세한 내용은 아래 바로가기를 눌러 확인하세요.':'');
+  return esc(display).replace(/\n/g,'<br>');
+};
 const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
 const diffDays=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
 /* YYYY-MM-DD 형식이면서 실제로 존재하는 날짜인지 확인 (예: 2027-02-30은 거부) */
@@ -2552,12 +2554,11 @@ function openTask(id){
       <div id="pubFields" ${t.isPublic?'':'hidden'}>
         <div class="field"><label for="pubLabel">학생에게 보여줄 이름</label>
           <input type="text" id="pubLabel" value="${esc(t.publicLabel||'')}" placeholder="비워두면 업무명 그대로 표시"></div>
-        <div class="row2">
-          <div class="field"><label for="pubKind">구분</label>
-            <select id="pubKind">${S_KIND.map(k=>`<option value="${k.id}" ${k.id===(t.publicKind||'pay')?'selected':''}>${esc(k.name)}</option>`).join('')}</select></div>
-          <div class="field"><label for="pubUrl">링크</label>
-            <input type="url" id="pubUrl" value="${esc(t.publicUrl||'')}" placeholder="https://"></div>
-        </div>
+        <div class="field"><label for="pubKind">구분</label>
+          <select id="pubKind">${S_KIND.map(k=>`<option value="${k.id}" ${k.id===(t.publicKind||'pay')?'selected':''}>${esc(k.name)}</option>`).join('')}</select></div>
+        <div class="field"><label for="pubUrl">바로가기 링크</label>
+          <input type="url" id="pubUrl" value="${esc(t.publicUrl||'')}" placeholder="https://">
+          <small style="display:block;margin-top:5px;color:var(--ink-3)">학생 화면에는 바로가기 버튼 하나로 표시됩니다. 안내 문구에 URL이 있으면 이 링크가 우선 사용됩니다.</small></div>
         <div class="field"><label for="pubDesc">안내 문구</label>
           <textarea id="pubDesc" placeholder="학생에게 보여줄 설명 (선택)">${esc(t.publicDesc||'')}</textarea></div>
         <button class="btn btn-sm" id="pubSave" data-task="${t.id}">공개 내용 저장</button>
@@ -2573,6 +2574,7 @@ function openTask(id){
 }
 function openEvent(id){
   const e=sById(id); if(!e)return;
+  const shortcutUrl=e.url||firstHttpUrl(e.desc);
   $('#drawer').innerHTML=`
     <div class="dr-top"><h2>${esc(e.name)}</h2><button class="x" id="drClose" aria-label="닫기">✕</button></div>
     <span class="st" style="color:${kind(e.kind).color};background:var(--surface-2)">${esc(kind(e.kind).name)}</span>
@@ -2580,8 +2582,8 @@ function openEvent(id){
       <dt>${e.start===e.end?'일자':'기간'}</dt><dd>${e.start===e.end?e.start:`${e.start} ~ ${e.end}`}</dd>
       <dt>남은 기간</dt><dd>${diffDays(TODAY,e.start)>0?`${diffDays(TODAY,e.start)}일 뒤 시작`:diffDays(TODAY,e.end)>=0?'진행 중':'종료됨'}</dd>
       <dt>문의</dt><dd>${esc(e.where)}</dd></dl>
-    <div class="note">${e.desc?linkifyDesc(e.desc):'등록된 안내 문구가 없습니다.'}</div>
-    ${e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener" class="btn btn-sm"
+    <div class="note">${e.desc?eventDescriptionHtml(e.desc):'등록된 안내 문구가 없습니다.'}</div>
+    ${shortcutUrl?`<a href="${esc(shortcutUrl)}" target="_blank" rel="noopener" class="btn btn-sm"
       style="display:inline-block;margin-top:14px;text-decoration:none">바로가기 ↗</a>`:''}`;
   $('#drawer').hidden=false;$('#scrim').hidden=false;$('#drClose').focus();
 }

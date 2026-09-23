@@ -109,7 +109,7 @@ using (
 /* 공개 페이지의 방문 숫자용 기록입니다. 기존 upsert가 아닌 insert만 허용합니다. */
 create policy "klink public visit insert"
 on public.klink_meta for insert to anon, authenticated
-with check (key like 'visit-%' and value ~ '^\\d{4}-\\d{2}-\\d{2}$');
+with check (key like 'visit-%' and value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 
 /* 로그인·활성화된 직원만 업무 원문, 이력, 업로드 설정을 모두 관리합니다. */
 create policy "klink staff meta manage"

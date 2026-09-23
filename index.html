@@ -2236,7 +2236,7 @@ function openNewFull(opts){
             <input type="url" id="nfPubUrl" placeholder="https://"></div>
         </div>
         <div class="field"><label for="nfPubDesc">안내 문구</label>
-          <div class="rich-tools"><button class="btn ghost btn-sm" type="button" data-add-link="nfPubDesc" onmousedown="event.preventDefault()">링크 삽입</button><small style="color:var(--ink-3)">글자를 선택한 뒤 주소를 연결하세요.</small></div>
+          <div class="rich-tools"><button class="btn ghost btn-sm" type="button" data-add-link="nfPubDesc" onmousedown="event.preventDefault()">링크 삽입</button><small style="color:var(--ink-3)">글자를 블록지정 한 뒤 주소를 연결하세요.</small></div>
           <div id="nfPubDesc" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="학생에게 보여줄 설명 (선택)"></div></div>
         <div class="hintline">업무를 추가하면 바로 학생용 캘린더에도 함께 표시됩니다.</div>
       </div>
@@ -2613,7 +2613,7 @@ function openTask(id){
           <input type="url" id="pubUrl" value="${esc(t.publicUrl||'')}" placeholder="https://">
           <small style="display:block;margin-top:5px;color:var(--ink-3)">학생 화면 아래쪽에 별도 바로가기 버튼으로 표시됩니다. 안내 문구 안의 링크는 본문에 표시됩니다.</small></div>
         <div class="field"><label for="pubDesc">안내 문구</label>
-          <div class="rich-tools"><button class="btn ghost btn-sm" type="button" data-add-link="pubDesc" onmousedown="event.preventDefault()">링크 삽입</button><small style="color:var(--ink-3)">글자를 선택한 뒤 주소를 연결하세요.</small></div>
+          <div class="rich-tools"><button class="btn ghost btn-sm" type="button" data-add-link="pubDesc" onmousedown="event.preventDefault()">링크 삽입</button><small style="color:var(--ink-3)">글자를 블록지정 한 뒤 주소를 연결하세요.</small></div>
           <div id="pubDesc" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="학생에게 보여줄 설명 (선택)">${editorHtmlFromText(t.publicDesc||'')}</div></div>
         <button class="btn btn-sm" id="pubSave" data-task="${t.id}">공개 내용 저장</button>
       </div>

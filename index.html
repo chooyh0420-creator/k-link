@@ -1174,7 +1174,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
           </div>
         </div>
       </div>
-      <div class="cf-no-events" id="cfNoEvents" role="status" hidden>해당장학을 찾을 수 없어요😧</div>
+      <div class="cf-no-events" id="cfNoEvents" role="status" hidden>현재 등록된 장학 일정이 없어요😧</div>
       <div class="hint" id="sHintBox"><span class="hint-track" id="sHintTrack"></span></div>
       <div class="dow"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
       <div id="sCalBody"></div>
@@ -2823,12 +2823,13 @@ function drawCalFilterEmptyNotice(){
   const notice=$('#cfNoEvents'); if(!notice)return;
   const opts=calFilterOptions(),sel=ensureCalFilterSel();
   const selected=opts.filter(o=>sel.has(o.id));
-  const weeks=monthMatrix(sCalY,sCalM);
-  const visibleStart=weeks[0][0].iso,visibleEnd=weeks[weeks.length-1][6].iso;
+  const monthStart=`${sCalY}-${String(sCalM+1).padStart(2,'0')}-01`;
+  const monthEnd=`${sCalY}-${String(sCalM+1).padStart(2,'0')}-${String(new Date(sCalY,sCalM+1,0).getDate()).padStart(2,'0')}`;
   const found=selected.length>0&&allStudentEvents().some(e=>{
     const k=filterKeywordFor(e.name);
-    return k&&selected.some(o=>o.id===k.id)&&(sFilter==='all'||e.kind===sFilter)&&e.start<=visibleEnd&&e.end>=visibleStart;
+    return k&&selected.some(o=>o.id===k.id)&&(sFilter==='all'||e.kind===sFilter)&&e.start<=monthEnd&&e.end>=monthStart;
   });
+  notice.textContent=`현재 등록된 장학 일정이 없어요😧 (${sCalY}년 ${sCalM+1}월 기준)`;
   notice.hidden=!selected.length||found;
 }
 

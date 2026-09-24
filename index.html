@@ -201,6 +201,7 @@ h1,h2,h3,h4{margin:0; font-weight:700; line-height:1.35}
 /* 3) 대상 탭 — 활성 탭이 아래 흰 화면으로 그대로 이어집니다 */
 .tabstrip{background:var(--strip); padding:6px 20px 0; border-bottom:1px solid var(--line)}
 .tabstrip-in{max-width:1500px; margin:0 auto; display:flex; align-items:flex-end; gap:3px}
+.mode-tabs{display:flex; align-items:flex-end; gap:3px; flex:none}
 .mtab{
   background:var(--tab-idle); color:var(--ink-2);
   border:1px solid var(--line); border-bottom:0; border-radius:6px 6px 0 0;
@@ -222,6 +223,12 @@ h1,h2,h3,h4{margin:0; font-weight:700; line-height:1.35}
 .mtab[data-mode="staff"] .ic{width:14px;height:14px}
 .mtab:focus-visible{outline:2px solid var(--brand); outline-offset:-3px}
 .strip-note{margin-left:auto; padding:0 4px 9px; font-size:11.5px; color:var(--ink-3); font-weight:500}
+.selfcheck-link{flex:none; display:inline-flex; align-items:center; gap:5px; margin:0 2px 7px 10px; padding:6px 11px;
+  border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.72); color:var(--brand);
+  font-size:11px; font-weight:750; line-height:1.2; text-decoration:none; white-space:nowrap; transition:all .15s}
+.selfcheck-link:hover{border-color:var(--brand); background:var(--surface); transform:translateY(-1px)}
+.selfcheck-link:focus-visible{outline:2px solid var(--brand); outline-offset:2px}
+.selfcheck-link[hidden]{display:none}
 /* 같은 데이터를 쓰는 탭 묶음 — 구분선만 두어 가볍게 */
 .tabsep{width:1px; height:16px; background:var(--line); margin:0 10px; flex:none; align-self:center}
 /* 학생용 캘린더를 다루는 탭은 오른쪽 끝으로 */
@@ -841,6 +848,13 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 .student-faq .faq-answer p{margin:0}
 .student-faq .faq-answer a{color:var(--brand); font-weight:700; text-underline-offset:3px}
 
+@media (min-width:601px) and (max-width:900px){
+  .tabstrip-in{flex-wrap:wrap; align-items:center; row-gap:0}
+  .mode-tabs{order:0}
+  .selfcheck-link{order:2; margin:0 2px 0 auto}
+  .strip-note{order:3; flex:0 0 100%; width:100%; margin-left:0; padding:4px 4px 8px}
+}
+
 @media (max-width:600px){
   .gnb{padding:0 12px}
   .gnb-in{height:auto; min-height:auto; padding:9px 0; flex-wrap:wrap; align-items:center; gap:6px; row-gap:6px}
@@ -861,6 +875,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 
   .tabstrip{padding:6px 10px 0}
   .tabstrip-in{flex-wrap:wrap; row-gap:6px}
+  .mode-tabs{order:0}
   .mtab{padding:8px 13px 9px; font-size:12px; gap:5px; white-space:nowrap}
   .mtab .ic{width:14px; height:14px}
   .mtab[aria-selected="true"]{padding-top:6px; padding-bottom:10px}
@@ -868,6 +883,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   .mtab[data-mode="staff"]{font-size:11px;padding:6px 7px 7px;gap:4px}
   .mtab[data-mode="staff"][aria-selected="true"]{font-size:11px;padding-top:4px;padding-bottom:7px}
   .mtab[data-mode="staff"] .ic{width:12px;height:12px}
+  .selfcheck-link{order:2; margin:0 2px 3px auto; padding:6px 9px; font-size:10.5px}
   .strip-note{order:3; width:100%; margin-left:0; padding:4px 2px 8px; font-size:11px}
   .tab{padding:11px 9px; font-size:12.5px}
   #sUpdatedAt{font-size:9px; gap:2px; padding:0 2px}
@@ -924,16 +940,21 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   <div class="accentline"></div>
 
   <div class="tabstrip">
-    <div class="tabstrip-in" role="tablist" aria-label="이용 대상">
-      <button class="mtab" role="tab" data-mode="student" aria-selected="true">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 9 12 4 2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5"/></svg>
-        학생용
-      </button>
-      <button class="mtab" role="tab" data-mode="staff" aria-selected="false">
-        <svg class="ic" id="staffIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-        직원용
-      </button>
+    <div class="tabstrip-in">
+      <div class="mode-tabs" role="tablist" aria-label="이용 대상">
+        <button class="mtab" role="tab" data-mode="student" aria-selected="true">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 9 12 4 2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5"/></svg>
+          학생용
+        </button>
+        <button class="mtab" role="tab" data-mode="staff" aria-selected="false">
+          <svg class="ic" id="staffIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          직원용
+        </button>
+      </div>
       <span class="strip-note" id="stripNote"></span>
+      <a class="selfcheck-link" id="selfCheckLink" href="https://kmu-scholarship.netlify.app/" target="_blank" rel="noopener noreferrer" aria-label="내 장학금 자가진단 사이트 바로가기, 새 창에서 열기" hidden>
+        장학금 자가진단 <span aria-hidden="true">↗</span>
+      </a>
     </div>
   </div>
 
@@ -3337,6 +3358,7 @@ function setMode(m){
     ? '<b class="stu-title">계명대 장학 캘린더</b><span class="sub">(장학금 언제받나요?🤷‍♂️)</span>'
     : '<b>K-Link</b><span class="sub">공동업무 연결체계</span>';
   $('#stripNote').textContent = locked ? '사번과 비밀번호로 로그인하면 열립니다.' : NOTE[m];
+  $('#selfCheckLink').hidden = m!=='student';
   $('#tabBar').innerHTML = locked ? '' : tabsHtml(m, TABS[m][0][0]);
   if(!locked) TABS[m].forEach(([id],i)=>{$('#'+id).hidden=i!==0});
   closeDrawer(); closeQuickpop();

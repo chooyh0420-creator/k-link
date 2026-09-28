@@ -2516,23 +2516,41 @@ function drawMemos(){
     :'<p class="empty" style="padding:16px 8px">아직 남긴 메모가 없습니다.</p>';
   if(openReply){ const ri=$('#replyInput'); if(ri) ri.focus(); }
 }
-function saveMemo(){
+async function saveMemo(){
+  if(STAFF_DATA_CONFLICT){stopStaffSaveOnConflict();return false;}
   const text=$('#memoInput').value.trim();
   if(!text){toast('메모 내용을 입력해주세요.');$('#memoInput').focus();return}
-  MEMOS.unshift({id:'M'+(memoSeq++), dept:myDept,
-    at:nowKSTMinute(), text, replies:[]});
+  const memo={id:'M'+(memoSeq++), dept:myDept,
+    at:nowKSTMinute(), text, replies:[]};
+  MEMOS.unshift(memo);
   $('#memoInput').value='';
-  drawMemos(); toast('메모를 남겼습니다.');
+  drawMemos();
+  const saved=await saveStaffAndReport('메모를 남겼습니다.');
+  if(!saved && STAFF_DATA_CONFLICT){
+    MEMOS=MEMOS.filter(m=>m.id!==memo.id);
+    drawMemos();
+    if(!$('#memoInput').value) $('#memoInput').value=text;
+  }
+  return saved;
 }
-function saveReply(memoId){
+async function saveReply(memoId){
+  if(STAFF_DATA_CONFLICT){stopStaffSaveOnConflict();return false;}
   const box=$('#replyInput'); if(!box) return;
   const text=box.value.trim();
   if(!text){ toast('답글 내용을 입력해주세요.'); box.focus(); return; }
   const m=MEMOS.find(x=>x.id===memoId); if(!m) return;
   if(!m.replies) m.replies=[];
-  m.replies.push({id:'R'+(replySeq++), dept:myDept,
-    at:nowKSTMinute(), text});
-  openReply=null; drawMemos(); toast('답글을 남겼습니다.');
+  const reply={id:'R'+(replySeq++), dept:myDept,
+    at:nowKSTMinute(), text};
+  m.replies.push(reply);
+  openReply=null; drawMemos();
+  const saved=await saveStaffAndReport('답글을 남겼습니다.');
+  if(!saved && STAFF_DATA_CONFLICT){
+    m.replies=m.replies.filter(r=>r.id!==reply.id);
+    openReply=memoId; drawMemos();
+    const retry=$('#replyInput'); if(retry) retry.value=text;
+  }
+  return saved;
 }
 
 /* ===== 달력 드래그 선택 (구글캘린더 방식) =====
@@ -3641,7 +3659,7 @@ document.addEventListener('click',e=>{
   const md=e.target.closest('[data-memodel]'); if(md){MEMOS=MEMOS.filter(m=>m.id!==md.dataset.memodel);drawMemos();return}
   const ro=e.target.closest('[data-replyopen]');
   if(ro){ openReply = (openReply===ro.dataset.replyopen) ? null : ro.dataset.replyopen; drawMemos(); return; }
-  const rs=e.target.closest('[data-replysave]'); if(rs){ saveReply(rs.dataset.replysave); return; }
+  const rs=e.target.closest('[data-replysave]'); if(rs){ e.__noStaffSave=true; saveReply(rs.dataset.replysave); return; }
   const rd=e.target.closest('[data-replydel]');
   if(rd){ const [mid,rid]=rd.dataset.replydel.split(':');
     const m=MEMOS.find(x=>x.id===mid);
@@ -3655,7 +3673,7 @@ document.addEventListener('click',e=>{
       saveStaffAndReport(t.isPublic?`"${t.name}" 학생 공개를 켰습니다.`:'학생 공개를 껐습니다.');
       e.__noStaffSave=true; }
     return; }
-  if(e.target.id==='memoSave'){saveMemo();return}
+  if(e.target.id==='memoSave'){e.__noStaffSave=true;saveMemo();return}
   if(e.target.id==='exportCsvBtn'){exportCsv();return}
   if(e.target.id==='printBtn'){window.print();return}
   /* 지급일 가져오기 */

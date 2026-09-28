@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
@@ -777,7 +777,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 .memo-item .mlink{font-size:11px; color:var(--ink-3); margin-top:5px}
 #memoList{padding-right:2px}
 .memo-tabs{max-height:60px; overflow-y:auto; margin-bottom:9px}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 
 /* ── 학생용: 장학 종류를 선택해주세요 (필터) ── */
 .cal-filter-row{padding:14px 16px 16px; border-bottom:1px solid var(--line-soft); background:var(--surface)}
@@ -892,7 +892,6 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   .strip-note{order:3; width:100%; margin-left:0; padding:4px 2px 8px; font-size:11px}
   .tab{padding:11px 9px; font-size:12.5px}
   #sUpdatedAt{font-size:9px; gap:2px; padding:0 2px}
-  #sUpdatedAt .opt-label{display:none}
   #t-cal .cal-top{justify-content:center}
   #sCalLegendTop{display:none}
   .wk-bars .bar{font-size:9.5px; padding:2px 4px; line-height:1.4}
@@ -917,6 +916,11 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   .cal-meta .updated-at{font-size:10px; gap:3px}
   .cal-meta .legend{gap:5px; font-size:10px; margin-left:0}
   .cal-meta .legend i{width:7px; height:7px; margin-right:3px}
+}
+@media (max-width:360px){
+  .gnb{padding-right:8px;padding-left:8px}
+  .logo .stu-title{font-size:17px}
+  .logo .sub{font-size:10px;margin-left:3px}
 }
 </style>
 </head>
@@ -1410,6 +1414,21 @@ async function cloudSetMeta(key, value){
     if(error) throw error; return true; }
   catch(err){ console.warn('클라우드 저장 실패(메타):', err); return false; }
 }
+const STUDENT_EVENT_COLUMNS='id,kind,name,start_date,end_date,description,location,url';
+const STAFF_META_KEYS=[
+  'notice_config','pay_updated_at','hidden_event_ids','public_task_events','public_pay_keywords',
+  'exclude_keywords','notice_config_history','pay_upload_history','staff_data_version','staff_data'
+];
+async function fetchAllPages(makeQuery,{pageSize=500,maxRows=20000}={}){
+  const rows=[];
+  for(let from=0;from<maxRows;from+=pageSize){
+    const {data,error}=await makeQuery().range(from,from+pageSize-1);
+    if(error)throw error;
+    const page=data||[]; rows.push(...page);
+    if(page.length<pageSize)return rows;
+  }
+  throw new Error(`조회 결과가 안전 한도(${maxRows}행)를 초과했습니다.`);
+}
 function persistPayUploadHistory(){
   return cloudSetMeta('pay_upload_history', JSON.stringify(PAY_UPLOAD_HISTORY.slice(0,30)));
 }
@@ -1454,7 +1473,7 @@ function loadNoticeHistSelected(){
 /* 학생용 캘린더 위 실제 흘러가는 안내 문구 상자를 NOTICE_CFG 값으로 채웁니다. */
 function drawHintMarquee(){
   const track=$('#sHintTrack'); if(!track) return;
-  track.innerHTML=`<span>${esc(NOTICE_CFG.text)}</span><span style="padding-left:80px">${esc(NOTICE_CFG.text)}</span>`;
+  track.innerHTML=`<span>${esc(NOTICE_CFG.text)}</span><span aria-hidden="true" style="padding-left:80px">${esc(NOTICE_CFG.text)}</span>`;
   track.style.animationDuration=NOTICE_CFG.speed+'s';
   track.style.fontSize=NOTICE_CFG.size+'px';
   track.style.color=NOTICE_CFG.color;
@@ -1485,24 +1504,34 @@ function drawNoticeSettings(){
 }
 /* '저장' 버튼 — 입력값을 검증해 NOTICE_CFG에 반영하고, 클라우드에 저장한 뒤
    실제 학생용 화면의 흘러가는 문구도 바로 바꿉니다. */
-function saveNoticeCfg(){
+async function saveNoticeCfg(){
   const text=$('#noticeText').value.trim();
   if(!text){ toast('안내 문구를 입력해주세요.'); $('#noticeText').focus(); return; }
-  if(NOTICE_CFG.text && NOTICE_CFG.text!==text){
-    NOTICE_HISTORY.unshift(Object.assign({}, NOTICE_CFG, {savedAt:new Date().toISOString()}));
-    NOTICE_HISTORY=NOTICE_HISTORY.slice(0,5);
-    persistNoticeHistory();
-  }
-  NOTICE_CFG={
+  const button=$('#noticeSave'),oldCfg=NOTICE_CFG,oldHistory=NOTICE_HISTORY;
+  const nextCfg={
     text,
     speed:Math.max(6, Math.min(60, +$('#noticeSpeed').value||18)),
     size:Math.max(10, Math.min(20, +$('#noticeSize').value||12.5)),
     color:$('#noticeColor').value||'#415670'
   };
-  persistNoticeCfg();
+  const changed=oldCfg.text!==nextCfg.text||oldCfg.speed!==nextCfg.speed||oldCfg.size!==nextCfg.size||oldCfg.color!==nextCfg.color;
+  if(button)button.disabled=true;
+  if(!(await cloudSetMeta('notice_config',JSON.stringify(nextCfg)))){
+    if(button)button.disabled=false;
+    toast('안내 문구 저장에 실패했습니다. 연결을 확인한 뒤 다시 시도해주세요.');
+    return;
+  }
+  NOTICE_CFG=nextCfg;
+  let historySaved=true;
+  if(changed&&oldCfg.text){
+    NOTICE_HISTORY=[Object.assign({},oldCfg,{savedAt:new Date().toISOString()}),...oldHistory].slice(0,5);
+    historySaved=await cloudSetMeta('notice_config_history',JSON.stringify(NOTICE_HISTORY));
+    if(!historySaved)NOTICE_HISTORY=oldHistory;
+  }
   drawHintMarquee();
   renderNoticeHistSelect();
-  toast('안내 문구를 저장했습니다. 학생용 캘린더에 바로 반영됩니다.');
+  if(button)button.disabled=false;
+  toast(historySaved?'안내 문구를 저장했습니다. 학생용 캘린더에 반영됩니다.':'안내 문구는 저장했지만 이전 문구 이력 저장에 실패했습니다.');
 }
 /* 업무 캘린더·부서별 업무·연결 지도·변경 이력·메모(TASKS/FLOWS/HISTORY/MEMOS)를
    통째로 클라우드에 저장합니다. 화면에서 뭔가 바뀔 때마다(클릭·입력·드래그 등)
@@ -1606,6 +1635,14 @@ function startStaffSave(){
     ()=>{ if(staffSavePromise===p) staffSavePromise=null; });
   return p;
 }
+async function saveStaffAndReport(successText){
+  scheduleStaffSave(true);
+  const pending=staffSavePromise;
+  const saved=pending ? await pending : false;
+  if(saved) toast(successText);
+  else if(!STAFF_DATA_CONFLICT) toast('저장하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해주세요.');
+  return saved;
+}
 function scheduleStaffSave(immediate=false){
   if(STAFF_DATA_CONFLICT) return;
   if(!STAFF_DATA_READY){
@@ -1630,7 +1667,8 @@ function scheduleStaffSave(immediate=false){
 async function flushStaffSave(){
   clearTimeout(staffSaveTimer);
   if(staffSavePromise) await staffSavePromise;
-  if(sb && hasStaffSession() && STAFF_DATA_READY && !STAFF_DATA_CONFLICT) await startStaffSave();
+  if(sb && hasStaffSession() && STAFF_DATA_READY && !STAFF_DATA_CONFLICT) return await startStaffSave();
+  return false;
 }
 function stopStaffSaveOnConflict(){
   STAFF_DATA_CONFLICT=true;
@@ -1639,28 +1677,32 @@ function stopStaffSaveOnConflict(){
   toast('다른 탭에서 업무자료가 먼저 변경되어 저장하지 않았습니다. 새로고침 후 다시 시도해주세요.');
 }
 async function persistStaffData(){
-  if(!sb || !hasStaffSession() || STAFF_DATA_CONFLICT) return;
-  if(!STAFF_DATA_READY){ STAFF_DATA_SAVE_QUEUED=true; return; }
-  if(STAFF_DATA_SAVE_IN_FLIGHT){ STAFF_DATA_SAVE_QUEUED=true; return; }
+  if(!sb || !hasStaffSession() || STAFF_DATA_CONFLICT) return false;
+  if(!STAFF_DATA_READY){ STAFF_DATA_SAVE_QUEUED=true; return false; }
+  if(STAFF_DATA_SAVE_IN_FLIGHT){ STAFF_DATA_SAVE_QUEUED=true; return false; }
   STAFF_DATA_SAVE_IN_FLIGHT=true;
-  /* 기존 저장자료에 남아 있는 선행업무 연결도 함께 정리해 저장합니다. */
-  TASKS.forEach(t=>{ t.prev=[]; });
-  const snapshot={TASKS, FLOWS, HISTORY, MEMOS, seq, flowSeq, memoSeq, replySeq};
-  const nextRaw=JSON.stringify(snapshot);
+  let claimed=null;
+  let saved=false;
   try{
-    /* 저장 직전에 현재 원문을 다시 읽어 다른 탭의 변경을 보호합니다.
-       버전 행을 조건부 UPDATE로 잠그는 방식은 Supabase 반환/RLS 조합에 따라
-       정상 UPDATE도 빈 결과로 보일 수 있어, 업무자료 저장을 오판해 버리는
-       원인이 됩니다. 최신 원문 비교가 실제 덮어쓰기 방지의 기준입니다. */
+    /* 버전 행을 조건부 UPDATE로 선점합니다. UPDATE는 DB에서 원자적으로
+       처리되므로 같은 버전을 본 두 탭 중 한 탭만 선점할 수 있습니다. */
+    claimed=await acquireStaffVersionLock();
+    if(!claimed) return false;
+
     const latest=await sb.from('klink_meta').select('value').eq('key','staff_data').maybeSingle();
     if(latest.error) throw latest.error;
     const latestRaw=latest.data?latest.data.value:null;
     if(latestRaw!==STAFF_DATA_RAW){
-      /* 같은 탭에서 여러 카드가 연속으로 바뀌면 직전 저장본과 서버 원문이
-         잠시 어긋날 수 있습니다. 이 시점의 화면 상태를 마지막 저장본으로
-         확정하되, 다른 탭의 잠금 충돌은 별도 버전 행에서 차단합니다. */
-      STAFF_DATA_RAW=latestRaw;
+      /* 버전 잠금과 별도로 실제 저장 원문도 비교합니다. 이전 버전의 화면이
+         잠금을 선점하지 못했거나 외부에서 자료를 바꾼 경우에는 덮어쓰지 않습니다. */
+      stopStaffSaveOnConflict();
+      return false;
     }
+
+    /* 저장자료에 남은 선행업무 연결을 함께 정리하고, 잠금 확보 뒤의 화면을 저장합니다. */
+    TASKS.forEach(t=>{ t.prev=[]; });
+    const snapshot={TASKS, FLOWS, HISTORY, MEMOS, seq, flowSeq, memoSeq, replySeq};
+    const nextRaw=JSON.stringify(snapshot);
     const result=await sb.from('klink_meta').upsert({key:'staff_data', value:nextRaw}).select('key');
     if(result.error) throw result.error;
     STAFF_DATA_RAW=nextRaw;
@@ -1672,16 +1714,20 @@ async function persistStaffData(){
     }else{
       PUBLIC_TASK_EVENTS=publicEvents;
     }
+    saved=!publicResult.error;
   }catch(err){
     console.warn('클라우드 저장 실패(업무자료):', err);
     toast('업무자료 저장에 실패했습니다. 인터넷 연결을 확인해주세요.');
+    saved=false;
   }finally{
+    await releaseStaffVersionLock(claimed);
     STAFF_DATA_SAVE_IN_FLIGHT=false;
     if(STAFF_DATA_SAVE_QUEUED && !STAFF_DATA_CONFLICT){
       STAFF_DATA_SAVE_QUEUED=false;
       scheduleStaffSave();
     }
   }
+  return saved;
 }
 /* 지급일 업로드로 반영된 항목을 '삭제'하면 실제로는 이 목록(hidden_event_ids)에
    id를 추가해 화면(캘린더·목록 어디서든)에서만 숨깁니다. 되돌릴 수 있게 원본
@@ -1696,12 +1742,10 @@ function metaRowsToMap(rows){
   const out={}; (rows||[]).forEach(r=>{ out[r.key]=r.value; }); return out;
 }
 function loadStudentEvents(rows){
-  if(rows && rows.length){
-    const known=new Set(S_EVENTS.map(e=>e.id));
-    rows.forEach(r=>{ if(!known.has(r.id)) S_EVENTS.push(rowToEvent(r)); });
-    const snNums=S_EVENTS.map(e=>{const m=String(e.id).match(/^SN(\d+)$/);return m?parseInt(m[1],10):0;});
-    sSeq=Math.max(sSeq,...snNums,100)+1;
-  }
+  const fresh=(rows||[]).map(rowToEvent);
+  S_EVENTS.splice(0,S_EVENTS.length,...fresh);
+  const snNums=S_EVENTS.map(e=>{const m=String(e.id).match(/^SN(\d+)$/);return m?parseInt(m[1],10):0;});
+  sSeq=Math.max(sSeq,...snNums,100)+1;
 }
 function applyPublicMeta(metaMap){
   if(metaMap.pay_updated_at){
@@ -1727,38 +1771,52 @@ function redrawCloudViews(){
   drawKeywords(); drawExcludeKeywords(); drawImportedList(); drawUploadHistory(); drawMemos(); drawNoticeSettings();
   if(mode==='student') drawStudent(); else if(mode==='staff' && hasStaffSession()) drawStaff();
 }
+let PUBLIC_SYNC_STATUS='loading';
+let PUBLIC_SYNC_LAST_SUCCESS=0;
+let PUBLIC_SYNC_PROMISE=null;
 async function initPublicCloudSync(){
-  if(!sb) return false;
-  try{
-    const [evRes,metaRes]=await Promise.all([
-      sb.from('klink_student_events').select('*').order('start_date'),
-      sb.from('klink_meta').select('key,value').in('key',PUBLIC_META_KEYS)
-    ]);
-    if(evRes.error) throw evRes.error;
-    if(metaRes.error) throw metaRes.error;
-    loadStudentEvents(evRes.data);
-    applyPublicMeta(metaRowsToMap(metaRes.data));
-    redrawCloudViews();
-    return true;
-  }catch(err){
-    console.warn('공개 일정 동기화 실패:',err);
-    redrawCloudViews();
-    return false;
-  }
+  if(!sb){ PUBLIC_SYNC_STATUS='error'; redrawCloudViews(); return false; }
+  if(PUBLIC_SYNC_PROMISE) return PUBLIC_SYNC_PROMISE;
+  if(!PUBLIC_SYNC_LAST_SUCCESS) PUBLIC_SYNC_STATUS='loading';
+  PUBLIC_SYNC_PROMISE=(async()=>{
+    try{
+      const [eventRows,metaRes]=await Promise.all([
+        fetchAllPages(()=>sb.from('klink_student_events').select(STUDENT_EVENT_COLUMNS).order('start_date').order('id')),
+        sb.from('klink_meta').select('key,value').in('key',PUBLIC_META_KEYS)
+      ]);
+      if(metaRes.error) throw metaRes.error;
+      loadStudentEvents(eventRows);
+      applyPublicMeta(metaRowsToMap(metaRes.data));
+      PUBLIC_SYNC_STATUS='ready'; PUBLIC_SYNC_LAST_SUCCESS=Date.now();
+      redrawCloudViews();
+      return true;
+    }catch(err){
+      console.warn('공개 일정 동기화 실패:',err);
+      if(!PUBLIC_SYNC_LAST_SUCCESS) PUBLIC_SYNC_STATUS='error';
+      redrawCloudViews();
+      return false;
+    }finally{ PUBLIC_SYNC_PROMISE=null; }
+  })();
+  return PUBLIC_SYNC_PROMISE;
 }
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden && Date.now()-PUBLIC_SYNC_LAST_SUCCESS>60000) initPublicCloudSync();
+});
+window.addEventListener('pageshow',()=>{
+  if(PUBLIC_SYNC_LAST_SUCCESS && Date.now()-PUBLIC_SYNC_LAST_SUCCESS>60000) initPublicCloudSync();
+});
 async function initStaffCloudSync(){
   if(!sb || !hasStaffSession()) return false;
   let strippedLegacyLinks=false;
   try{
-    const [evRes,kwRes,metaRes]=await Promise.all([
-      sb.from('klink_student_events').select('*').order('start_date'),
+    const [eventRows,kwRes,metaRes]=await Promise.all([
+      fetchAllPages(()=>sb.from('klink_student_events').select('id,kind,name,start_date,end_date,description,location,url,source,source_title,amount').order('start_date').order('id')),
       sb.from('klink_pay_keywords').select('*').order('created_at'),
-      sb.from('klink_meta').select('key,value')
+      sb.from('klink_meta').select('key,value').in('key',STAFF_META_KEYS)
     ]);
-    if(evRes.error) throw evRes.error;
     if(kwRes.error) throw kwRes.error;
     if(metaRes.error) throw metaRes.error;
-    loadStudentEvents(evRes.data);
+    loadStudentEvents(eventRows);
     const metaMap=metaRowsToMap(metaRes.data);
     applyPublicMeta(metaMap);
     if(kwRes.data && kwRes.data.length){
@@ -1770,7 +1828,13 @@ async function initStaffCloudSync(){
     }
     if(metaMap.public_pay_keywords)orderKeywordsFromPublicMeta(metaMap.public_pay_keywords);
     else if(!(await persistPublicKeywords()))toast('학생용 장학 목록을 공용 서버에 동기화하지 못했습니다. 직원용 목록 동기화 상태를 확인해주세요.');
-    if(metaMap.exclude_keywords){ try{ EXCLUDE_KEYWORDS=JSON.parse(metaMap.exclude_keywords); }catch(_){} }
+    if(metaMap.exclude_keywords){
+      try{
+        EXCLUDE_KEYWORDS=JSON.parse(metaMap.exclude_keywords);
+        const nums=EXCLUDE_KEYWORDS.map(x=>parseInt(String(x.id).replace(/\D/g,''),10)||0);
+        exSeq=Math.max(exSeq,1,...nums)+1;
+      }catch(_){}
+    }
     else{ await persistExcludeKeywords(); }
     if(!metaMap.notice_config){ await persistNoticeCfg(); }
     if(metaMap.notice_config_history){ try{ NOTICE_HISTORY=JSON.parse(metaMap.notice_config_history)||[]; }catch(_){ NOTICE_HISTORY=[]; } }
@@ -1826,12 +1890,25 @@ const byId=id=>TASKS.find(t=>t.id===id), sById=id=>allStudentEvents().find(e=>e.
 const dept=id=>DEPTS.find(d=>d.id===id)||{name:id,color:'#888'};
 const kind=id=>S_KIND.find(k=>k.id===id)||{name:id,color:'#888'};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function safeHttpUrl(value){
+  const raw=String(value||'').trim();
+  if(!raw)return '';
+  try{const url=new URL(raw);return /^https?:$/.test(url.protocol)&&!url.username&&!url.password?url.href:'';}
+  catch(_){return '';}
+}
+function newStudentEventId(){
+  const token=globalThis.crypto&&typeof crypto.randomUUID==='function'
+    ?crypto.randomUUID().replace(/-/g,'')
+    :Date.now().toString(36)+Math.random().toString(36).slice(2,14);
+  return 'SN'+token;
+}
 /* 안내 문구는 작성한 내용을 유지하고 URL만 인라인 하이퍼링크로 표시합니다. */
-const firstHttpUrl=s=>{const m=String(s||'').match(/https?:\/\/[^\s<]+/);return m?m[0].replace(/[),.;]+$/,''):''};
+const firstHttpUrl=s=>{const m=String(s||'').match(/https?:\/\/[^\s<]+/);return m?safeHttpUrl(m[0].replace(/[),.;]+$/,'')):''};
 const linkifyDesc=s=>esc(s).replace(/(https?:\/\/[^\s<]+)/g,m=>{
   const url=m.replace(/[),.;]+$/,'');
   const suffix=m.slice(url.length);
-  return `<a href="${url}" target="_blank" rel="noopener">${url}</a>${suffix}`;
+  const safe=safeHttpUrl(url);
+  return safe?`<a href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>${suffix}`:`${esc(url)}${suffix}`;
 }).replace(/\n/g,'<br>');
 function sanitizeRichHtml(html){
   const doc=new DOMParser().parseFromString(String(html||''),'text/html');
@@ -1842,8 +1919,9 @@ function sanitizeRichHtml(html){
     if(tag==='br')return '<br>';
     if(tag==='a'){
       const href=node.getAttribute('href')||'';
-      if(!/^https?:\/\//i.test(href))return children;
-      return `<a href="${esc(href)}" target="_blank" rel="noopener">${children}</a>`;
+      const safe=safeHttpUrl(href);
+      if(!safe)return children;
+      return `<a href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${children}</a>`;
     }
     if(tag==='div'||tag==='p')return `${children}<br>`;
     return children;
@@ -1880,8 +1958,8 @@ function insertEditorLink(editorId){
   const after=document.createRange();after.setStartAfter(a);after.collapse(true);
   sel.removeAllRanges();sel.addRange(after);editor.focus();
 }
-const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
-const diffDays=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
+const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+const diffDays=(a,b)=>Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000);
 /* YYYY-MM-DD 형식이면서 실제로 존재하는 날짜인지 확인 (예: 2027-02-30은 거부) */
 function isValidISODate(s){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
@@ -2126,9 +2204,10 @@ function deleteFlow(id){
 function moveTaskFromStaffCalendar(taskId,newDate){
   const t=byId(taskId); if(!t||!isValidISODate(newDate)||t.date===newDate) return;
   const oldDate=t.date, oldEnd=t.end;
-  const span=t.end&&t.end!==t.date?diffDays(t.date,t.end):0;
+  const hasEnd=!!t.end;
+  const span=hasEnd?Math.max(0,diffDays(t.date,t.end)):0;
   t.date=newDate;
-  if(span>0) t.end=addDays(newDate,span);
+  if(hasEnd) t.end=addDays(newDate,span);
   if(t.status!=='완료') t.status='일정변경';
   const oldLabel=oldEnd&&oldEnd!==oldDate?`${oldDate} ~ ${oldEnd}`:oldDate;
   const newLabel=t.end&&t.end!==t.date?`${t.date} ~ ${t.end}`:t.date;
@@ -2280,6 +2359,11 @@ function saveQuick(){
   const name=$('#qpTitle').value.trim();
   if(!name){ toast('업무명을 입력해주세요.'); $('#qpTitle').focus(); return; }
   const start=$('#qpStart').value, end=$('#qpEnd').value||start;
+  if(!isValidISODate(start) || !isValidISODate(end) || end<start){
+    toast('시작일과 종료일을 확인해주세요.');
+    (!isValidISODate(start)?$('#qpStart'):$('#qpEnd')).focus();
+    return;
+  }
   const deptV=$('#qpDept').value;
   DRAFT=null;                       // 임시 블록을 실제 업무로 확정
   $('#quickpop').hidden=true;
@@ -2289,8 +2373,7 @@ function saveQuick(){
   const f=FLOWS.find(x=>x.id===t.flow);
   if(f){ if(!f.order) f.order=[]; if(!f.order.includes(t.id)) f.order.push(t.id); }
   syncOrder(); drawFlows(); drawDeptRows();
-  scheduleStaffSave(true);
-  toast(`"${name}" 업무를 추가했습니다. 부서별 업무·연결 지도에도 함께 등록됩니다.`);
+  saveStaffAndReport(`"${name}" 업무를 추가했습니다. 부서별 업무·연결 지도에도 함께 등록됩니다.`);
 }
 
 function addTask({name,dept,owner,date,end,flow,calendarEnabled=true,files,criteria,note}){
@@ -2363,23 +2446,28 @@ function saveNewFull(){
   const name=$('#nfName').value.trim();
   if(!name){toast('업무명을 입력해주세요.');$('#nfName').focus();return}
   const date=$('#nfDate').value, end=$('#nfEnd').value||date;
+  if(!isValidISODate(date) || !isValidISODate(end) || end<date){
+    toast('시작일과 종료일을 확인해주세요.');
+    (!isValidISODate(date)?$('#nfDate'):$('#nfEnd')).focus();
+    return;
+  }
+  const pubOn=$('#nfPubOn'),isPub=!!(pubOn&&pubOn.checked),rawPublicUrl=isPub?$('#nfPubUrl').value.trim():'';
+  if(rawPublicUrl&&!safeHttpUrl(rawPublicUrl)){toast('바로가기 주소는 http:// 또는 https:// 주소만 입력할 수 있습니다.');$('#nfPubUrl').focus();return;}
   const t=addTask({name, dept:$('#nfDept').value, owner:$('#nfOwner').value.trim(), date, end,
     flow:FLOWS[0]&&FLOWS[0].id,
     files:[], criteria:[], note:$('#nfNote').value.trim()});
-  const pubOn=$('#nfPubOn'), isPub=!!(pubOn&&pubOn.checked);
   if(isPub){
     t.isPublic=true;
     t.publicLabel=$('#nfPubLabel').value.trim();
     t.publicKind=$('#nfPubKind').value;
-    t.publicUrl=$('#nfPubUrl').value.trim();
+    t.publicUrl=safeHttpUrl(rawPublicUrl);
     t.publicDesc=sanitizeRichHtml($('#nfPubDesc').innerHTML);
   }
   const f=FLOWS.find(x=>x.id===t.flow);
   if(f){ if(!f.order) f.order=[]; if(!f.order.includes(t.id)) f.order.push(t.id); }
   syncOrder(); drawFlows(); drawDeptRows();
-  scheduleStaffSave(true);
   closeDrawer();
-  toast(isPub?`"${name}" 업무를 추가하고 학생용 캘린더에도 바로 표시했습니다.`
+  saveStaffAndReport(isPub?`"${name}" 업무를 추가하고 학생용 캘린더에도 바로 표시했습니다.`
              :`"${name}" 업무를 추가했습니다. 캘린더·연결 지도에도 함께 등록됩니다.`);
 }
 
@@ -2588,9 +2676,9 @@ function publishedTasks(){ return PUBLIC_TASK_EVENTS; }
    장학명 자체가 같은지 비교할 때 쓰는 기준 이름을 만듭니다. */
 function dedupBaseName(name){
   let s=String(name||'').trim();
-  while(/\([^()]*\)\s*$/.test(s)){
-    s=s.replace(/\([^()]*\)\s*$/,'').trim();
-  }
+  /* 장학명 구분에 쓰이는 괄호(예: 성적우수·학업우수)는 보존합니다.
+     결의제목의 지급 방식 꼬리표만 중복 비교에서 제외합니다. */
+  s=s.replace(/\s*\((?=[^)]*(?:대출상환|개인지급))[^)]*\)\s*$/,'').trim();
   return s || String(name||'').trim();
 }
 /* 같은 구분·기간에 장학명이 같은 일정(예: 국가근로장학금 지급이 국고/교비로 나뉜 경우,
@@ -2618,10 +2706,20 @@ function importedEvents(){
     .sort((a,b)=>b.start.localeCompare(a.start));
 }
 function deleteImportedEvent(id){
+  if(!S_EVENTS.some(e=>e.id===id) || HIDDEN_IDS.has(id)) return;
   HIDDEN_IDS.add(id);
-  persistHiddenIds();
   drawImportedList();
   drawStudent();
+  persistHiddenIds().then(ok=>{
+    if(!ok){
+      HIDDEN_IDS.delete(id);
+      drawImportedList();
+      drawStudent();
+      toast('장학 일정 숨김 저장에 실패했습니다. 다시 시도해주세요.');
+      return;
+    }
+    toast('장학 일정을 목록에서 숨겼습니다.');
+  });
 }
 const studentEvents=()=>{
   return filteredStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter)
@@ -2772,7 +2870,13 @@ function buildCsv(){
       ]);
     });
   });
-  return '\ufeff'+rows.map(r=>r.map(c=>`"${String(c==null?'':c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const csvCell=value=>{
+    const text=String(value==null?'':value);
+    /* Excel formula injection: neutralize cells whose first visible character is =,+,-,@. */
+    const safe=/^[\u0000-\u0020\u007f-\u009f]*[=+\-@]/.test(text)?"'"+text:text;
+    return `"${safe.replace(/"/g,'""')}"`;
+  };
+  return '\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
 }
 async function exportCsv(){
   const csv=buildCsv();
@@ -2850,9 +2954,9 @@ let NOTICE_HISTORY=[]; // 안내 문구를 저장할 때마다 이전 값을 최
 /* 학생용 캘린더 "장학 종류를 선택해주세요" 필터.
    기본값은 항상 '전체'입니다. 키워드와 매칭되지 않는 일정(수기 추가·학생공개 등)은
    필터 대상이 아니라 항상 그대로 보여줍니다 — 실수로 안 보이게 되는 일이 없도록. */
-function filterKeywordFor(name){
+function filterKeywordsFor(name){
   const base=dedupBaseName(name);
-  return PUBLIC_KEYWORDS.find(k=>(k.label && base===k.label) || (k.word && base.includes(k.word))) || null;
+  return PUBLIC_KEYWORDS.filter(k=>(k.label && base===k.label) || (k.word && base.includes(k.word)));
 }
 let CAL_FILTER_SEL=null;
 let CAL_FILTER_TOUCHED=false;
@@ -2867,7 +2971,13 @@ function orderKeywordsFromPublicMeta(raw){
     if(!Array.isArray(saved))return;
     const ids=saved.map(k=>typeof k==='string'?k:k&&k.id).filter(Boolean);
     const rank=new Map(ids.map((id,i)=>[String(id),i]));
-    PUBLIC_KEYWORDS.sort((a,b)=>(rank.get(String(a.id))??Number.MAX_SAFE_INTEGER)-(rank.get(String(b.id))??Number.MAX_SAFE_INTEGER));
+    const sortBySavedOrder=list=>{
+      const original=new Map(list.map((k,i)=>[String(k.id),i]));
+      list.sort((a,b)=>(rank.get(String(a.id))??Number.MAX_SAFE_INTEGER)-(rank.get(String(b.id))??Number.MAX_SAFE_INTEGER)
+        ||(original.get(String(a.id))??0)-(original.get(String(b.id))??0));
+    };
+    sortBySavedOrder(KEYWORDS);
+    sortBySavedOrder(PUBLIC_KEYWORDS);
   }catch(_){}
 }
 async function persistPublicKeywords(){
@@ -2896,9 +3006,10 @@ function saveCalFilterSel(){
   CAL_FILTER_TOUCHED=true;
 }
 function nameFilterPass(e){
-  const k=filterKeywordFor(e.name);
-  if(!k) return true; // 키워드에 안 걸리는 항목은 항상 표시
-  return ensureCalFilterSel().has(k.id);
+  const matches=filterKeywordsFor(e.name);
+  if(!matches.length) return true; // 키워드에 안 걸리는 항목은 항상 표시
+  const selected=ensureCalFilterSel();
+  return matches.some(k=>selected.has(k.id));
 }
 function filteredStudentEvents(){ return allStudentEvents().filter(nameFilterPass); }
 function calFilterSummaryText(){
@@ -2933,13 +3044,20 @@ function updateCalFilterScrollbar(){
 }
 function drawCalFilterEmptyNotice(){
   const notice=$('#cfNoEvents'); if(!notice)return;
+  if(PUBLIC_SYNC_STATUS==='loading'){
+    notice.textContent='장학 일정을 불러오고 있습니다…'; notice.hidden=false; return;
+  }
+  if(PUBLIC_SYNC_STATUS==='error'){
+    notice.textContent='장학 일정을 불러오지 못했습니다. 잠시 후 다시 확인해주세요.'; notice.hidden=false; return;
+  }
   const opts=calFilterOptions(),sel=ensureCalFilterSel();
   const selected=opts.filter(o=>sel.has(o.id));
+  const selectedIds=new Set(selected.map(o=>o.id));
   const monthStart=`${sCalY}-${String(sCalM+1).padStart(2,'0')}-01`;
   const monthEnd=`${sCalY}-${String(sCalM+1).padStart(2,'0')}-${String(new Date(sCalY,sCalM+1,0).getDate()).padStart(2,'0')}`;
   const found=selected.length>0&&allStudentEvents().some(e=>{
-    const k=filterKeywordFor(e.name);
-    return k&&selected.some(o=>o.id===k.id)&&(sFilter==='all'||e.kind===sFilter)&&e.start<=monthEnd&&e.end>=monthStart;
+    const matches=filterKeywordsFor(e.name);
+    return matches.some(k=>selectedIds.has(k.id))&&(sFilter==='all'||e.kind===sFilter)&&e.start<=monthEnd&&e.end>=monthStart;
   });
   notice.textContent=`현재 등록된 장학 일정이 없어요😧 (${sCalY}년 ${sCalM+1}월 기준)`;
   notice.hidden=!selected.length||found;
@@ -2961,18 +3079,18 @@ function drawKeywords(){
   const mk=$('#manKind');
   if(mk && !mk.options.length) mk.innerHTML=S_KIND.map(k=>`<option value="${k.id}" ${k.id==='pay'?'selected':''}>${esc(k.name)}</option>`).join('');
 }
-function addKeyword(){
+async function addKeyword(){
   const w=$('#kwWord').value.trim();
   if(!w){ toast('결의제목에 들어가는 말을 입력해주세요.'); $('#kwWord').focus(); return; }
+  if(KEYWORDS.some(k=>k.word===w)){toast('이미 등록된 장학 키워드입니다.');return;}
   const k={id:'K'+(kwSeq++), word:w, label:$('#kwLabel').value.trim(), kind:$('#kwKind').value};
   KEYWORDS.push(k);
-  cloudInsertKeyword(k).then(ok=>{
-    if(ok)persistPublicKeywords();
-    else toast('장학 목록은 화면에 추가했지만 서버 저장에 실패했습니다.');
-  });
+  const saved=await cloudInsertKeyword(k);
+  if(!saved){KEYWORDS=KEYWORDS.filter(x=>x.id!==k.id);kwSeq=Math.max(kwSeq,16);drawKeywords();toast('장학 키워드 저장에 실패했습니다. 다시 시도해주세요.');return;}
   $('#kwWord').value=''; $('#kwLabel').value='';
   drawKeywords();
-  toast(`"${w}" 장학을 목록에 추가했습니다. 다음에 파일을 넣을 때부터 적용됩니다.`);
+  const publicSaved=await persistPublicKeywords();
+  toast(publicSaved?`"${w}" 장학을 저장했습니다.`:`"${w}" 직원용 키워드는 저장했지만 학생용 목록 동기화에 실패했습니다.`);
 }
 function initKeywordReorder(){
   const list=$('#kwList'); if(!list)return;
@@ -3024,15 +3142,20 @@ function drawExcludeKeywords(){
   }).join('')
     : '<div class="kwempty">등록된 제외 규칙이 없습니다.</div>';
 }
-function addExcludeKeyword(){
+async function addExcludeKeyword(){
   const w=$('#exWord').value.trim();
   if(!w){ toast('제외할 말을 입력해주세요.'); $('#exWord').focus(); return; }
   const ex={id:'X'+(exSeq++), word:w, except:$('#exExcept').value.trim(), on:true};
   EXCLUDE_KEYWORDS.push(ex);
-  persistExcludeKeywords();
+  drawExcludeKeywords();
+  if(!(await persistExcludeKeywords())){
+    EXCLUDE_KEYWORDS=EXCLUDE_KEYWORDS.filter(x=>x.id!==ex.id);
+    exSeq=Math.max(2,exSeq-1);drawExcludeKeywords();
+    toast('제외 규칙 저장에 실패했습니다. 연결을 확인한 뒤 다시 시도해주세요.');return;
+  }
   $('#exWord').value=''; $('#exExcept').value='';
   drawExcludeKeywords();
-  toast(`"${w}" 제외 규칙을 추가했습니다. 다음에 파일을 넣을 때부터 적용됩니다.`);
+  toast(`"${w}" 제외 규칙을 저장했습니다.`);
 }
 
 /* 전표번호 → 날짜 */
@@ -3041,8 +3164,7 @@ function slipToDate(v){
   const m=s.match(/^(\d{4})(\d{2})(\d{2})\s*-\s*\d+/);
   if(!m) return null;
   const iso=`${m[1]}-${m[2]}-${m[3]}`;
-  const d=new Date(iso+'T00:00:00');
-  return isNaN(d.getTime())?null:iso;
+  return isValidISODate(iso)?iso:null;
 }
 /* 결의제목 다듬기: 앞의 학기 표기와 대괄호 부분을 걷어냅니다 */
 function cleanTitle(t){
@@ -3055,11 +3177,19 @@ function matchKeyword(title){
 }
 
 function readSheet(file){
+  const maxBytes=25*1024*1024;
+  if(file.size>maxBytes){ toast('파일이 너무 큽니다. 25MB 이하로 나눠서 업로드해주세요.'); return; }
   const reader=new FileReader();
   reader.onload=ev=>{
     try{
-      const wb=XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      const maxDataRows=10000;
+      const wb=XLSX.read(new Uint8Array(ev.target.result), {type:'array',sheetRows:maxDataRows+2});
       const ws=wb.Sheets[wb.SheetNames[0]];
+      const sourceRange=ws['!fullref']||ws['!ref']||'A1';
+      if(XLSX.utils.decode_range(sourceRange).e.r+1>maxDataRows+1){
+        toast(`행이 너무 많습니다. 제목 행을 포함해 ${maxDataRows+1}행 이하로 나눠 업로드해주세요.`);
+        return;
+      }
       const grid=XLSX.utils.sheet_to_json(ws,{header:1, defval:'', raw:false});
       buildPreview(grid);
     }catch(err){
@@ -3070,17 +3200,19 @@ function readSheet(file){
 }
 /* 이번 업로드가 새로 추가할 항목과 이미 반영된 항목을 미리 계산합니다. */
 function importPlan(matched){
-  const current=importedEvents();
+  const current=S_EVENTS.filter(e=>e.source==='import'||e.source==='manual');
   const exactKeys=new Set(current.filter(e=>e.srcTitle).map(e=>e.start+'|'+e.srcTitle));
   const legacyCount={};
   current.filter(e=>!e.srcTitle).forEach(e=>{
     const k=e.start+'|'+e.name;
     legacyCount[k]=(legacyCount[k]||0)+1;
   });
-  const seenNow={};
+  const seenNow={},seenExactNow=new Set();
   const toAdd=[], duplicate=[];
   matched.forEach(r=>{
-    if(exactKeys.has(r.date+'|'+r.title)){ duplicate.push(r); return; }
+    const exactKey=r.date+'|'+r.title;
+    if(exactKeys.has(exactKey)||seenExactNow.has(exactKey)){ duplicate.push(r); return; }
+    seenExactNow.add(exactKey);
     const ldKey=r.date+'|'+r.label;
     seenNow[ldKey]=(seenNow[ldKey]||0)+1;
     if(seenNow[ldKey]<=(legacyCount[ldKey]||0)){ duplicate.push(r); return; }
@@ -3229,7 +3361,7 @@ async function autoImportMatched(matched){
   const toAdd=plan.toAdd;
   let newEvents=[];
   if(toAdd.length){
-    newEvents=toAdd.map(r=>({id:'SN'+(sSeq++), kind:r.kind, name:r.label, start:r.date, end:r.date,
+    newEvents=toAdd.map(r=>({id:newStudentEventId(), kind:r.kind, name:r.label, start:r.date, end:r.date,
       desc:'', where:'장학복지팀', url:'', source:'import', srcTitle:r.title, amount:r.amount}));
     if(!(await cloudInsertEvents(newEvents))) return null;
     S_EVENTS.push(...newEvents);
@@ -3296,7 +3428,8 @@ async function addManualEvent(){
   const knd=$('#manKind').value||'pay';
   if(!date){ toast('지급일(날짜)을 입력해주세요.'); $('#manDate').focus(); return; }
   if(!label){ toast('학생에게 보여줄 이름을 입력해주세요.'); $('#manLabel').focus(); return; }
-  const ev={id:'SN'+(sSeq++), kind:knd, name:label, start:date, end:date,
+  if(!isValidISODate(date)){ toast('날짜 형식이 올바르지 않습니다.'); $('#manDate').focus(); return; }
+  const ev={id:newStudentEventId(), kind:knd, name:label, start:date, end:date,
     desc:'', where:'장학복지팀', url:'', source:'manual', srcTitle:label};
   if(!(await cloudInsertEvents([ev]))){ toast('일정 저장에 실패했습니다. 인터넷 연결을 확인해주세요.'); return; }
   S_EVENTS.push(ev);
@@ -3326,15 +3459,25 @@ async function countVisit(){
     if(error)console.warn('방문 기록 저장 실패:',error);
   }catch(err){ console.warn('방문 기록 저장 실패:',err); }
   try{
-    /* 공용 행을 직접 읽어 모든 기기가 같은 누적·당일 수치를 표시합니다. */
-    const {data:visitRows,error}=await sb.from('klink_meta')
-      .select('key,value').like('key','visit-%').limit(10000);
-    if(error)throw error;
-    const rows=visitRows||[];
-    const total=rows.length;
-    const day=rows.filter(r=>r.value===today).length;
-    if(a)a.textContent=total.toLocaleString();
-    if(b)b.textContent=day.toLocaleString();
+    let counts;
+    try{
+      /* 집계 함수가 배포된 서버에서는 숫자만 받아 방문기록 전체 전송을 피합니다. */
+      const {data,error}=await sb.rpc('klink_visit_counts',{today_date:today});
+      if(error)throw error;
+      counts=Array.isArray(data)?data[0]:data;
+    }catch(aggregateError){
+      /* SQL 적용 전/구버전 서버와의 호환 경로입니다. 서버 집계 배포 후에는 사용되지 않습니다. */
+      console.warn('서버 집계 함수를 사용할 수 없어 기존 방문기록 조회로 대체합니다:',aggregateError);
+      const rows=await fetchAllPages(
+        ()=>sb.from('klink_meta').select('value').like('key','visit-%').order('key'),
+        {pageSize:500,maxRows:100000}
+      );
+      counts={total:rows.length,today:rows.filter(row=>row.value===today).length};
+    }
+    if(!counts||!Number.isFinite(Number(counts.total))||!Number.isFinite(Number(counts.today)))
+      throw new Error('방문 집계 결과 형식이 올바르지 않습니다.');
+    if(a)a.textContent=Number(counts.total).toLocaleString();
+    if(b)b.textContent=Number(counts.today).toLocaleString();
   }catch(err){
     console.warn('공용 방문 집계 조회 실패:',err);
     if(a)a.textContent='—';
@@ -3434,7 +3577,10 @@ async function tryUnlock(){
   }catch(err){
     if(staffAuthUser && sb) await sb.auth.signOut();
     staffUnlocked=false; staffAuthUser=null;
-    $('#lkErr').textContent=err.message&&err.message.includes('활성화')?err.message:'사번 또는 비밀번호가 맞지 않습니다.';
+    const message=String(err&&err.message||'');
+    $('#lkErr').textContent=message.includes('활성화')?message
+      :/invalid login credentials|invalid grant/i.test(message)?'사번 또는 비밀번호가 맞지 않습니다.'
+      :'로그인 처리 중 문제가 발생했습니다. 인터넷 연결을 확인한 뒤 다시 시도해주세요.';
     $('#lkPassword').value=''; $('#lkPassword').focus();
   }finally{
     button.disabled=false; button.textContent='로그인';
@@ -3506,7 +3652,8 @@ document.addEventListener('click',e=>{
   const pt=e.target.closest('[data-pubtoggle]');
   if(pt){ const t=byId(pt.dataset.pubtoggle);
     if(t){ t.isPublic=!t.isPublic; drawDeptRows();
-      toast(t.isPublic?`"${t.name}" 학생 공개를 켰습니다.`:'학생 공개를 껐습니다.'); }
+      saveStaffAndReport(t.isPublic?`"${t.name}" 학생 공개를 켰습니다.`:'학생 공개를 껐습니다.');
+      e.__noStaffSave=true; }
     return; }
   if(e.target.id==='memoSave'){saveMemo();return}
   if(e.target.id==='exportCsvBtn'){exportCsv();return}
@@ -3531,8 +3678,7 @@ document.addEventListener('click',e=>{
     return;
   }
   const di=e.target.closest('[data-delimp]');
-  if(di){ const ev=S_EVENTS.find(x=>x.id===di.dataset.delimp); deleteImportedEvent(di.dataset.delimp);
-    if(ev) toast(`"${ev.name}" 항목을 학생용 캘린더에서 삭제했습니다.`);
+  if(di){ deleteImportedEvent(di.dataset.delimp);
     return; }
   if(e.target.id==='manAdd'){addManualEvent();return}
   const ev=e.target.closest('[data-ev2]');
@@ -3554,7 +3700,17 @@ document.addEventListener('click',e=>{
   if(!e.__noStaffSave) scheduleStaffSave();
 });
 $('#scrim').addEventListener('click',closeDrawer);
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeQuickpop()}});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  closeDrawer(); closeQuickpop();
+  const pop=$('#calFilterPop');
+  if(pop&&!pop.hidden){
+    pop.hidden=true;
+    $('#calFilterBtn').setAttribute('aria-expanded','false');
+    $('#calFilterRow').after($('#cfNoEvents'));
+    $('#calFilterBtn').focus();
+  }
+});
 $('#quickpop').addEventListener('click',e=>{
   (function(e){
   if(e.target.id==='qpX'||e.target.id==='qpX2'){closeQuickpop();return}
@@ -3593,9 +3749,9 @@ $('#drawer').addEventListener('click',e=>{
     const deptV=$('#tiDept').value;
     const owner=$('#tiOwner').value.trim()||'미지정';
     const date=$('#tiDate').value;
-    if(!date){ toast('예정일을 입력해주세요.'); $('#tiDate').focus(); return; }
+    if(!isValidISODate(date)){ toast('올바른 예정일을 입력해주세요.'); $('#tiDate').focus(); return; }
     let end=$('#tiEnd').value;
-    if(end && end<date) end=date;
+    if(end && (!isValidISODate(end)||end<date)){ toast('종료일은 시작일 이후의 올바른 날짜로 입력해주세요.'); $('#tiEnd').focus(); return; }
     const changed = name!==t.name || deptV!==t.dept || owner!==t.owner || date!==t.date || (end||'')!==(t.end||'');
     if(changed){
       HISTORY.unshift({at:nowKSTMinute(),who:dept(myDept).name+' 담당자',
@@ -3604,19 +3760,21 @@ $('#drawer').addEventListener('click',e=>{
     t.name=name; t.dept=deptV; t.owner=owner; t.date=date; t.end=end||undefined; t.baseDate=date;
     afterMapEdit();
     openTask(t.id);
-    toast('업무 정보를 저장했습니다.');
+    saveStaffAndReport('업무 정보를 저장했습니다.');
     return;
   }
   if(e.target.id==='pubSave'){
     const t=byId(e.target.dataset.task); if(!t) return;
+    const rawUrl=$('#pubUrl').value.trim(),safeUrl=safeHttpUrl(rawUrl);
+    if(rawUrl&&!safeUrl){toast('바로가기 주소는 http:// 또는 https:// 주소만 입력할 수 있습니다.');$('#pubUrl').focus();return;}
     t.publicLabel=$('#pubLabel').value.trim();
     t.publicKind=$('#pubKind').value;
-    t.publicUrl=$('#pubUrl').value.trim();
+    t.publicUrl=safeUrl;
     t.publicDesc=sanitizeRichHtml($('#pubDesc').innerHTML);
     t.isPublic=true;
     drawDeptRows();
     closeDrawer();
-    toast('학생 공개 내용을 저장했습니다.');
+    saveStaffAndReport('학생 공개 내용을 저장했습니다.');
     return;
   }
   if(e.target.id==='stSave'){
@@ -3624,7 +3782,7 @@ $('#drawer').addEventListener('click',e=>{
     if(ns!==t.status){
       HISTORY.unshift({at:nowKSTMinute(),who:dept(myDept).name+' 담당자',
         task:t.id,what:`상태 ${t.status} → ${ns}`,why:'담당자 직접 변경',affect:'-'});
-      t.status=ns;toast('상태를 저장했습니다.');drawStaff();openTask(t.id);
+      t.status=ns;drawStaff();openTask(t.id);saveStaffAndReport('상태를 저장했습니다.');
     }
   }
   })(e);
@@ -3685,11 +3843,15 @@ document.addEventListener('change', e=>{
   if(ik){
     const ev=S_EVENTS.find(x=>x.id===ik.dataset.impkind);
     if(ev && ev.kind!==ik.value){
-      ev.kind=ik.value;
-      cloudUpdateEventKind(ev.id, ik.value);
+      const oldKind=ev.kind,newKind=ik.value;
+      ev.kind=newKind;
       drawImportedList();
       drawStudent();
-      toast('구분을 변경했습니다.');
+      cloudUpdateEventKind(ev.id,newKind).then(ok=>{
+        if(!ok){ev.kind=oldKind;drawImportedList();drawStudent();toast('구분 저장에 실패해 기존 값으로 되돌렸습니다.');}
+        else toast('구분을 저장했습니다.');
+      });
+      e.__noStaffSave=true;
     }
     return;
   }
@@ -3697,10 +3859,14 @@ document.addEventListener('change', e=>{
   if(exo){
     const x=EXCLUDE_KEYWORDS.find(v=>v.id===exo.dataset.exon);
     if(x){
+      const oldOn=x.on!==false;
       x.on=exo.checked;
-      persistExcludeKeywords();
       drawExcludeKeywords();
-      toast(x.on?`"${x.word}" 제외 규칙을 켰습니다.`:`"${x.word}" 제외 규칙을 껐습니다.`);
+      persistExcludeKeywords().then(ok=>{
+        if(!ok){x.on=oldOn;drawExcludeKeywords();toast('제외 규칙 저장에 실패해 기존 설정으로 되돌렸습니다.');}
+        else toast('제외 규칙을 저장했습니다.');
+      });
+      e.__noStaffSave=true;
     }
     return;
   }
@@ -3750,7 +3916,8 @@ document.addEventListener('keydown', e=>{
     if(btn) saveReply(btn.dataset.replysave);
     return;
   }
-  if(e.key==='Enter' && e.target.closest && e.target.closest('[contenteditable]')){
+  if(e.key==='Enter' && e.target.closest && e.target.closest('[contenteditable]')
+     && !e.target.closest('[aria-multiline="true"]')){
     e.preventDefault(); e.target.blur();
   }
   })(e);

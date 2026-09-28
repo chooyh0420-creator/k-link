@@ -1317,11 +1317,13 @@ let UPLOAD_HISTORY_OPEN=false;
 let UPLOAD_HISTORY_YEAR='';
 let UPLOAD_HISTORY_MONTH='';
 try{ PAY_UPDATED_AT = localStorage.getItem('klink_pay_updated_at'); }catch(_){}
-function markPayUpdated(){
-  PAY_UPDATED_AT = new Date().toISOString();
+async function markPayUpdated(){
+  const updatedAt = new Date().toISOString();
+  if(!(await cloudSetMeta('pay_updated_at', updatedAt))) return false;
+  PAY_UPDATED_AT = updatedAt;
   try{ localStorage.setItem('klink_pay_updated_at', PAY_UPDATED_AT); }catch(_){}
-  cloudSetMeta('pay_updated_at', PAY_UPDATED_AT);
   drawUpdatedAt();
+  return true;
 }
 function drawUpdatedAt(){
   const els=[$('#sUpdatedAt'), $('#sUpdatedAtFoot')].filter(Boolean);
@@ -3090,9 +3092,11 @@ function renderImportCheck(result){
   if(result.skippedNonPay) notes.push(`수입·대체 ${result.skippedNonPay}건 제외`);
   if(result.skippedByRule) notes.push(`자동 제외 규칙 ${result.skippedByRule}건 제외`);
   if(result.errorRows) notes.push('전표번호·결의제목이 없는 행은 저장하지 않습니다.');
+  $('#importConfirm').disabled=!result.matched.length;
+  $('#importConfirm').textContent=result.plan.toAdd.length?'검증 결과로 저장':result.matched.length?'신규 없이 업데이트':'일치 항목 없음';
+  if(result.matched.length&&!result.plan.toAdd.length) notes.push('기존 등록 항목만 확인되어 일정을 추가하지 않고 자료 업데이트 시각을 갱신합니다.');
+  if(!result.matched.length) notes.push('등록된 장학 키워드와 일치하는 항목이 없어 자료 업데이트 시각을 변경하지 않습니다.');
   $('#importCheckNote').textContent=notes.length?notes.join(' / '):'저장 전에 위 결과를 확인해주세요.';
-  $('#importConfirm').disabled=!result.plan.toAdd.length;
-  $('#importConfirm').textContent=result.plan.toAdd.length?'검증 결과로 저장':'새로 저장할 항목 없음';
   $('#importCancel').hidden=false;
 }
 function clearImportCheck(){
@@ -3100,22 +3104,46 @@ function clearImportCheck(){
   const box=$('#importCheck');
   if(box) box.hidden=true;
 }
-function confirmImport(){
-  if(!PENDING_IMPORT) return;
-  const addedEvents=autoImportMatched(PENDING_IMPORT.matched);
-  markPayUpdated();
+async function confirmImport(){
+  const pending=PENDING_IMPORT;
+  if(!pending||!pending.matched.length) return;
+  const button=$('#importConfirm');
+  button.disabled=true;
+  button.textContent='저장 중…';
+  const result=await autoImportMatched(pending.matched);
+  if(!result){
+    button.disabled=false;
+    button.textContent='다시 시도';
+    toast('일정 저장에 실패했습니다. 연결을 확인한 뒤 다시 시도해주세요.');
+    return;
+  }
+  const addedEvents=result.events;
   const n=addedEvents.length;
   NEW_IMPORT_IDS=new Set(addedEvents.map(e=>e.id));
   const history={
     id:'UP'+Date.now(), at:new Date().toISOString(),
     fileName:$('#fileName').textContent||'(파일명 없음)',
-    totalRows:PENDING_IMPORT.totalRows, payRows:PENDING_IMPORT.payRows,
-    excludedRows:PENDING_IMPORT.excludedRows, matchedCount:PENDING_IMPORT.matched.length,
-    newCount:n, duplicateCount:PENDING_IMPORT.plan.duplicate.length,
-    errorRows:PENDING_IMPORT.errorRows, newEventIds:addedEvents.map(e=>e.id)
+    totalRows:pending.totalRows, payRows:pending.payRows,
+    excludedRows:pending.excludedRows, matchedCount:pending.matched.length,
+    newCount:n, duplicateCount:result.duplicateCount,
+    errorRows:pending.errorRows, newEventIds:addedEvents.map(e=>e.id)
   };
+  if(!(await markPayUpdated())){
+    button.disabled=false;
+    button.textContent=n?'다시 시도':'신규 없이 다시 시도';
+    toast('일정은 처리했지만 자료 업데이트 날짜를 서버에 저장하지 못했습니다. 다시 시도해주세요.');
+    return;
+  }
+  const previousHistory=PAY_UPLOAD_HISTORY;
   PAY_UPLOAD_HISTORY=[history,...PAY_UPLOAD_HISTORY].slice(0,30);
-  persistPayUploadHistory();
+  if(!(await persistPayUploadHistory())){
+    PAY_UPLOAD_HISTORY=previousHistory;
+    drawUploadHistory();
+    button.disabled=false;
+    button.textContent=n?'다시 시도':'신규 없이 다시 시도';
+    toast('자료 업데이트 날짜는 저장했지만 업로드 이력을 저장하지 못했습니다.');
+    return;
+  }
   drawUploadHistory();
   drawImportedList();
   drawStudent();
@@ -3123,8 +3151,10 @@ function confirmImport(){
   $('#importConfirm').disabled=true;
   $('#importConfirm').textContent='저장 완료';
   $('#importCancel').hidden=true;
-  $('#importCheckNote').textContent=`검증 결과에 따라 ${n}건을 학생용 캘린더에 저장했습니다.`;
-  toast(`${n}건을 학생용 캘린더에 저장했습니다.`);
+  $('#importCheckNote').textContent=n
+    ?`검증 결과에 따라 ${n}건을 학생용 캘린더에 저장하고 자료 업데이트 날짜를 갱신했습니다.`
+    :`신규 일정은 없지만 기존 ${result.duplicateCount}건을 확인하고 자료 업데이트 날짜를 갱신했습니다.`;
+  toast(n?`${n}건을 저장하고 자료 업데이트 날짜를 갱신했습니다.`:`신규 일정은 없으며 자료 업데이트 날짜를 갱신했습니다.`);
 }
 /* 파일을 넣으면 먼저 검증 결과를 보여주고, 사용자가 확인한 뒤 저장합니다.
    이미 반영된 결의(같은 결의제목)는 중복으로 저장하지 않습니다. */
@@ -3185,18 +3215,19 @@ function buildPreview(grid){
    - 예전에(이 기능이 지금 방식으로 바뀌기 전에) 이미 반영된 항목은 결의제목 원문이
      없을 수 있어, 그런 경우에는 '같은 날짜·같은 이름'이 파일에 몇 건 있는지를 세어
      그 개수만큼은 이미 반영된 것으로 보고 넘어갑니다. */
-function autoImportMatched(matched){
-  const toAdd=importPlan(matched).toAdd;
+async function autoImportMatched(matched){
+  const plan=importPlan(matched);
+  const toAdd=plan.toAdd;
   let newEvents=[];
   if(toAdd.length){
     newEvents=toAdd.map(r=>({id:'SN'+(sSeq++), kind:r.kind, name:r.label, start:r.date, end:r.date,
       desc:'', where:'장학복지팀', url:'', source:'import', srcTitle:r.title, amount:r.amount}));
+    if(!(await cloudInsertEvents(newEvents))) return null;
     S_EVENTS.push(...newEvents);
-    cloudInsertEvents(newEvents);
     drawStudent();
   }
   drawImportedList();
-  return newEvents||[];
+  return {events:newEvents,duplicateCount:plan.duplicate.length};
 }
 function drawUploadHistory(){
   const el=$('#uploadHistoryList'), body=$('#uploadHistoryBody'), yearSel=$('#uploadHistoryYear'), monthSel=$('#uploadHistoryMonth');
@@ -3250,7 +3281,7 @@ function drawImportedList(){
   $('#prevCount').textContent = rows.length ? `현재 ${rows.length}건 반영됨` : '';
 }
 /* 파일 없이 한 건만 바로 추가하고 싶을 때 씁니다(예: 아직 결의서로 못 받은 확정 지급일). */
-function addManualEvent(){
+async function addManualEvent(){
   const date=$('#manDate').value;
   const label=$('#manLabel').value.trim();
   const knd=$('#manKind').value||'pay';
@@ -3258,13 +3289,13 @@ function addManualEvent(){
   if(!label){ toast('학생에게 보여줄 이름을 입력해주세요.'); $('#manLabel').focus(); return; }
   const ev={id:'SN'+(sSeq++), kind:knd, name:label, start:date, end:date,
     desc:'', where:'장학복지팀', url:'', source:'manual', srcTitle:label};
+  if(!(await cloudInsertEvents([ev]))){ toast('일정 저장에 실패했습니다. 인터넷 연결을 확인해주세요.'); return; }
   S_EVENTS.push(ev);
-  cloudInsertEvents([ev]);
-  markPayUpdated();
+  const updated=await markPayUpdated();
   $('#manLabel').value='';
   drawImportedList();
   drawStudent();
-  toast(`"${label}" 항목을 학생용 캘린더에 추가했습니다.`);
+  toast(updated?`"${label}" 항목을 학생용 캘린더에 추가했습니다.`:`"${label}" 항목은 저장했지만 자료 업데이트 날짜 저장에 실패했습니다.`);
 }
 
 /* ===== 모드 · 탭 ===== */

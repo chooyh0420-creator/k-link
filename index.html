@@ -1636,6 +1636,10 @@ function startStaffSave(){
   return p;
 }
 async function saveStaffAndReport(successText){
+  /* 입력 중 시작된 자동 저장이 끝나기 전에 명시적 저장을 호출하면
+     in-flight 보호가 false를 반환하므로, 기존 저장을 먼저 기다립니다. */
+  while(staffSavePromise) await staffSavePromise;
+  if(STAFF_DATA_CONFLICT){stopStaffSaveOnConflict();return false;}
   scheduleStaffSave(true);
   const pending=staffSavePromise;
   const saved=pending ? await pending : false;

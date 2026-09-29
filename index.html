@@ -392,6 +392,7 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .navbtn{border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-2);
   width:32px; height:32px; border-radius:6px; font-size:15px; line-height:1}
 .navbtn:hover{border-color:var(--brand); color:var(--brand)}
+.navbtn:disabled,.navbtn:disabled:hover{cursor:not-allowed;opacity:.45;background:var(--surface-2);color:var(--ink-3);border-color:var(--line-soft)}
 .today-btn{border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-2);
   padding:7px 14px; border-radius:6px; font-size:12.5px; font-weight:700}
 .today-btn:hover{border-color:var(--brand); color:var(--brand)}
@@ -2734,6 +2735,8 @@ attachDrag($('#calBody'), (a,b)=>{
   if(anchor) openNewQuick(a,b,anchor);
 });
 attachStaffTaskDrag($('#calBody'));
+const STUDENT_MIN_YEAR=2026, STUDENT_MIN_MONTH=2;
+const studentMonthBeforeMin=(year,month)=>year<STUDENT_MIN_YEAR||(year===STUDENT_MIN_YEAR&&month<STUDENT_MIN_MONTH);
 let sCalY=+TODAY.slice(0,4), sCalM=+TODAY.slice(5,7)-1, sFilter='all', sPastOpen=false, selectedStudentDate=TODAY;
 let sSeq=100;
 /* 직원용에서 '학생 공개'를 켠 업무를 학생 공개용 사본으로 변환합니다.
@@ -2802,6 +2805,14 @@ const studentEvents=()=>{
       kind:e.kind,color:NEW_IMPORT_IDS.has(e.id)?'#2563EB':kind(e.kind).color,src:'sev'}));
 };
 function drawStudent(){
+  if(studentMonthBeforeMin(sCalY,sCalM)){sCalY=STUDENT_MIN_YEAR;sCalM=STUDENT_MIN_MONTH;selectedStudentDate=null;}
+  const prevMonthButton=$('#sPrevM');
+  if(prevMonthButton){
+    const atEarliestMonth=!studentMonthBeforeMin(sCalY,sCalM)&&sCalY===STUDENT_MIN_YEAR&&sCalM===STUDENT_MIN_MONTH;
+    prevMonthButton.disabled=atEarliestMonth;
+    prevMonthButton.setAttribute('aria-disabled',String(atEarliestMonth));
+    prevMonthButton.title=atEarliestMonth?'가장 이른 달력은 2026년 3월입니다.':'이전 달';
+  }
   drawHintMarquee();
   drawCalFilter();
   drawCalFilterEmptyNotice();
@@ -3944,7 +3955,9 @@ $('#drawer').addEventListener('click',e=>{
 function shiftMonth(w,n){
   if(w==='staff'){calM+=n;if(calM<0){calM=11;calY--}if(calM>11){calM=0;calY++}drawStaffCal()}
   else{
-    sCalM+=n;if(sCalM<0){sCalM=11;sCalY--}if(sCalM>11){sCalM=0;sCalY++}
+    const targetMonth=new Date(sCalY,sCalM+n,1);
+    if(studentMonthBeforeMin(targetMonth.getFullYear(),targetMonth.getMonth()))return;
+    sCalY=targetMonth.getFullYear();sCalM=targetMonth.getMonth();
     selectedStudentDate=null;
     drawStudent();
   }
@@ -3954,7 +3967,7 @@ $('#nextM').onclick=()=>shiftMonth('staff',1);
 $('#todayBtn').onclick=()=>{calY=+TODAY.slice(0,4);calM=+TODAY.slice(5,7)-1;drawStaffCal()};
 $('#sPrevM').onclick=()=>shiftMonth('student',-1);
 $('#sNextM').onclick=()=>shiftMonth('student',1);
-$('#sTodayBtn').onclick=()=>{sCalY=+TODAY.slice(0,4);sCalM=+TODAY.slice(5,7)-1;selectedStudentDate=TODAY;drawStudent()};
+$('#sTodayBtn').onclick=()=>{sCalY=+TODAY.slice(0,4);sCalM=+TODAY.slice(5,7)-1;if(studentMonthBeforeMin(sCalY,sCalM)){sCalY=STUDENT_MIN_YEAR;sCalM=STUDENT_MIN_MONTH;selectedStudentDate=null}else selectedStudentDate=TODAY;drawStudent()};
 window.matchMedia('(max-width:600px)').addEventListener('change',()=>{if(mode==='student')drawStudent()});
 
 /* 업무 연결 지도 카드 날짜칸: 타이핑하는 대로 YYYY-MM-DD 형태를 유지시켜줌 */

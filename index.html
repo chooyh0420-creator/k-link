@@ -3873,8 +3873,7 @@ function shiftMonth(w,n){
   if(w==='staff'){calM+=n;if(calM<0){calM=11;calY--}if(calM>11){calM=0;calY++}drawStaffCal()}
   else{
     sCalM+=n;if(sCalM<0){sCalM=11;sCalY--}if(sCalM>11){sCalM=0;sCalY++}
-    const monthPrefix=`${sCalY}-${String(sCalM+1).padStart(2,'0')}`;
-    if(!selectedStudentDate.startsWith(monthPrefix))selectedStudentDate=`${monthPrefix}-01`;
+    selectedStudentDate=null;
     drawStudent();
   }
 }

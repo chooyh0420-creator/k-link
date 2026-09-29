@@ -421,6 +421,8 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .wk-grid button{border:0; border-right:1px solid var(--line-soft); background:transparent; padding:0;
   position:relative; user-select:none}
 .wk-grid button[data-newday]{cursor:pointer; touch-action:none}
+.wk-grid button[data-student-date]{cursor:pointer;touch-action:manipulation}
+.wk-grid button[data-student-date].day-selected{background:color-mix(in srgb,var(--brand) 13%,transparent);box-shadow:inset 0 0 0 2px var(--brand);border-radius:5px}
 .wk-grid button:last-child{border-right:0}
 .wk-grid button.off{background:var(--surface-2)}
 .wk-grid button.istoday{background:var(--brand-soft)}
@@ -847,6 +849,19 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 .student-faq .faq-answer{padding:0 20px 18px; color:var(--ink-2); font-size:13px; line-height:1.8}
 .student-faq .faq-answer p{margin:0}
 .student-faq .faq-answer a{color:var(--brand); font-weight:700; text-underline-offset:3px}
+.student-list-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;padding:10px 12px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:9px}
+.student-list-controls p{margin:0;min-width:0;color:var(--ink-2);font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.student-list-controls b{color:var(--ink);font-weight:700}
+.student-day-agenda{margin:0 8px 10px;padding:11px 12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-sm)}
+.student-day-agenda h3{display:flex;align-items:center;gap:7px;margin:0 0 8px;font-size:13px;color:var(--ink)}
+.student-day-agenda h3 .count-chip{font-size:10px}
+.student-day-agenda .day-agenda-empty{margin:0;color:var(--ink-3);font-size:12px}
+.student-day-agenda-list{display:grid;gap:6px}
+.student-day-agenda-item{display:flex;align-items:flex-start;gap:8px;width:100%;padding:8px 9px;text-align:left;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:7px;color:var(--ink);font:inherit;cursor:pointer}
+.student-day-agenda-item:hover{border-color:var(--line-strong);background:var(--surface)}
+.student-day-agenda-item .day-kind{flex:none;padding:2px 6px;border-radius:99px;background:var(--day-color);color:#fff;font-size:10px;font-weight:700;line-height:1.45}
+.student-day-agenda-item .day-event-name{min-width:0;font-size:12px;font-weight:700;line-height:1.55;overflow-wrap:anywhere}
+.student-day-agenda-item:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 
 @media (min-width:901px){
   .strip-note{margin-left:10px}
@@ -861,6 +876,9 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
 }
 
 @media (max-width:600px){
+  .student-list-controls{align-items:flex-start}
+  .student-list-controls p{font-size:11.5px}
+  .student-day-agenda{margin:0 5px 9px;padding:10px}
   .gnb{padding:0 12px}
   .gnb-in{height:auto; min-height:auto; padding:9px 0; flex-wrap:wrap; align-items:center; gap:6px; row-gap:6px}
   .logo{display:contents}
@@ -1243,6 +1261,10 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   <section class="panel" id="t-list" hidden>
     <div class="sec-head"><h2>장학금 일정 전체보기</h2>
       <p>신청 기간과 지급 예정일을 한 번에 확인할 수 있습니다.</p></div>
+    <div class="student-list-controls">
+      <p id="sListFilterText" role="status" aria-live="polite">현재 표시 기준: 전체 장학금 · 전체 일정</p>
+      <button type="button" class="mini" id="sListFilterReset">필터 전체 초기화</button>
+    </div>
     <div class="filters" id="sChips"></div>
     <div class="tbl-wrap stbl-list"><table>
       <thead><tr><th>구분</th><th>장학금</th><th>기간 / 일자</th></tr></thead>
@@ -2008,7 +2030,7 @@ function monthMatrix(y,m){
   }
   return weeks;
 }
-function renderCalendar(container,titleEl,y,m,events,clickable,addLabel){
+function renderCalendar(container,titleEl,y,m,events,clickable,addLabel,daySelection=null){
   titleEl.textContent=`${y}년 ${m+1}월`;
   container.innerHTML=monthMatrix(y,m).map(days=>{
     const wS=days[0].iso, wE=days[6].iso;
@@ -2030,15 +2052,27 @@ function renderCalendar(container,titleEl,y,m,events,clickable,addLabel){
     }).join('');
     const cells=days.map(d=>clickable
       ? `<button class="${d.off?'off':''} ${d.iso===TODAY?'istoday':''}" data-newday="${d.iso}" data-addlabel="${addLabel||'+ 추가'}" aria-label="${d.iso} 추가"></button>`
-      : `<button class="${d.off?'off':''} ${d.iso===TODAY?'istoday':''}" disabled style="cursor:default"></button>`).join('');
+      : daySelection
+        ? `<button type="button" class="${d.off?'off':''} ${d.iso===TODAY?'istoday':''} ${d.iso===daySelection.date?'day-selected':''}" data-student-date="${d.iso}" aria-pressed="${d.iso===daySelection.date}" aria-label="${d.iso} 일정 보기"${d.off?' disabled':''}></button>`
+        : `<button class="${d.off?'off':''} ${d.iso===TODAY?'istoday':''}" disabled style="cursor:default"></button>`).join('');
     const nums=days.map(d=>{
       const cls=d.off?'off':(d.dow===0?'sun':d.dow===6?'sat':'');
       return `<div class="dnum ${cls}">${d.iso===TODAY?`<span class="badge">${d.day}</span>`:d.day}</div>`;
     }).join('');
-    return `<div class="week">
+    const weekHtml=`<div class="week">
       <div class="wk-grid">${cells}</div>
       <div class="wk-nums">${nums}</div>
       <div class="wk-bars" style="min-height:${Math.max(1,lanes.length)*24+8}px">${bars}</div></div>`;
+    if(!daySelection||!days.some(d=>d.iso===daySelection.date)) return weekHtml;
+    const date=daySelection.date;
+    const dayEvents=events.filter(e=>e.start<=date&&e.end>=date);
+    const dayLabel=`${+date.slice(5,7)}월 ${+date.slice(8,10)}일`;
+    const items=dayEvents.map(e=>`<button type="button" class="student-day-agenda-item" data-ev2="${esc(e.id)}" data-kindev="${esc(e.src)}" style="--day-color:${esc(e.color)}">
+      <span class="day-kind">${esc(kind(e.kind).name)}</span><span class="day-event-name">${esc(e.name)}${e.start!==e.end?` · ${e.start} ~ ${e.end}`:''}</span></button>`).join('');
+    return weekHtml+`<section class="student-day-agenda" aria-label="${date} 일정" aria-live="polite">
+      <h3>${dayLabel} 일정 <span class="count-chip">${dayEvents.length}건</span></h3>
+      ${items?`<div class="student-day-agenda-list">${items}</div>`:'<p class="day-agenda-empty">이 날짜에 등록된 일정이 없습니다.</p>'}
+    </section>`;
   }).join('');
 }
 
@@ -2681,7 +2715,7 @@ attachDrag($('#calBody'), (a,b)=>{
   if(anchor) openNewQuick(a,b,anchor);
 });
 attachStaffTaskDrag($('#calBody'));
-let sCalY=+TODAY.slice(0,4), sCalM=+TODAY.slice(5,7)-1, sFilter='all', sPastOpen=false;
+let sCalY=+TODAY.slice(0,4), sCalM=+TODAY.slice(5,7)-1, sFilter='all', sPastOpen=false, selectedStudentDate=TODAY;
 let sSeq=100;
 /* 직원용에서 '학생 공개'를 켠 업무를 학생 공개용 사본으로 변환합니다.
    학생 화면은 이 사본만 읽으며, 업무 원문(staff_data)은 받지 않습니다. */
@@ -2746,13 +2780,14 @@ function deleteImportedEvent(id){
 const studentEvents=()=>{
   return filteredStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter)
     .map(e=>({id:e.id,name:e.name,start:e.start,end:e.end,
-      color:NEW_IMPORT_IDS.has(e.id)?'#2563EB':kind(e.kind).color,src:'sev'}));
+      kind:e.kind,color:NEW_IMPORT_IDS.has(e.id)?'#2563EB':kind(e.kind).color,src:'sev'}));
 };
 function drawStudent(){
   drawHintMarquee();
   drawCalFilter();
   drawCalFilterEmptyNotice();
-  renderCalendar($('#sCalBody'),$('#sCalTitle'),sCalY,sCalM,studentEvents(),false);
+  const daySelection=window.matchMedia('(max-width:600px)').matches?{date:selectedStudentDate}:null;
+  renderCalendar($('#sCalBody'),$('#sCalTitle'),sCalY,sCalM,studentEvents(),false,null,daySelection);
   const legendHtml=[{id:'all',name:'전체',color:null}].concat(S_KIND).map(k=>
     `<button type="button" class="legend-btn" data-skind="${k.id}" aria-pressed="${k.id===sFilter}"${k.color?` style="--k-color:${k.color}"`:''}>${k.color?`<i style="background:${k.color}"></i>`:''}${esc(k.name)}</button>`
   ).join('');
@@ -2771,6 +2806,13 @@ function drawStudent(){
     :'<p class="empty">예정된 일정이 없습니다.</p>';
   $('#sChips').innerHTML=[{id:'all',name:'전체'}].concat(S_KIND)
     .map(k=>`<button class="chip" data-skind="${k.id}" aria-pressed="${k.id===sFilter}">${esc(k.name)}</button>`).join('');
+  const listFilterText=$('#sListFilterText');
+  if(listFilterText) listFilterText.textContent=`장학금: ${calFilterSummaryText()} · 일정 구분: ${sFilter==='all'?'전체':kind(sFilter).name}`;
+  const resetListFilter=$('#sListFilterReset');
+  if(resetListFilter){
+    const opts=calFilterOptions(),selected=ensureCalFilterSel();
+    resetListFilter.disabled=sFilter==='all'&&opts.every(o=>selected.has(o.id));
+  }
   const rows=filteredStudentEvents().filter(e=>sFilter==='all'||e.kind===sFilter).sort((a,b)=>a.start.localeCompare(b.start));
   const rowHtml=e=>`<tr>
     <td><span class="st" style="color:${kind(e.kind).color};background:var(--surface-2)">${esc(kind(e.kind).name)}</span></td>
@@ -3042,6 +3084,12 @@ function calFilterSummaryText(){
   if(selOpts.length===opts.length) return '전체';
   const names=selOpts.map(o=>o.name);
   return names.length<=2 ? names.join(', ') : `${names.slice(0,2).join(', ')} 외 ${names.length-2}개`;
+}
+function resetStudentFilters(){
+  CAL_FILTER_SEL=new Set(calFilterOptions().map(o=>o.id));
+  CAL_FILTER_TOUCHED=true;
+  sFilter='all';
+  drawStudent();
 }
 function drawCalFilter(){
   const btn=$('#calFilterSummary'), list=$('#cfList');
@@ -3712,6 +3760,15 @@ document.addEventListener('click',e=>{
   }
   const tk=e.target.closest('[data-task]'); if(tk&&!tk.id){openTask(tk.dataset.task);return}
   const dc=e.target.closest('[data-dept]'); if(dc){deptFilter=dc.dataset.dept;drawDeptChips();drawDeptRows();return}
+  if(e.target.closest('#sListFilterReset')){e.__noStaffSave=true;resetStudentFilters();return}
+  const studentDay=e.target.closest('[data-student-date]');
+  if(studentDay&&!studentDay.disabled){
+    e.__noStaffSave=true;
+    selectedStudentDate=studentDay.dataset.studentDate;
+    drawStudent();
+    document.querySelector(`[data-student-date="${selectedStudentDate}"]`)?.focus({preventScroll:true});
+    return;
+  }
   const sk=e.target.closest('[data-skind]'); if(sk){sFilter=sk.dataset.skind;drawStudent();return}
   const ptg=e.target.closest('[data-pasttoggle]'); if(ptg){sPastOpen=!sPastOpen;drawStudent();return}
   if(!$('#quickpop').hidden && !justDragged && !e.target.closest('#quickpop')
@@ -3812,14 +3869,20 @@ $('#drawer').addEventListener('click',e=>{
 });
 function shiftMonth(w,n){
   if(w==='staff'){calM+=n;if(calM<0){calM=11;calY--}if(calM>11){calM=0;calY++}drawStaffCal()}
-  else{sCalM+=n;if(sCalM<0){sCalM=11;sCalY--}if(sCalM>11){sCalM=0;sCalY++}drawStudent()}
+  else{
+    sCalM+=n;if(sCalM<0){sCalM=11;sCalY--}if(sCalM>11){sCalM=0;sCalY++}
+    const monthPrefix=`${sCalY}-${String(sCalM+1).padStart(2,'0')}`;
+    if(!selectedStudentDate.startsWith(monthPrefix))selectedStudentDate=`${monthPrefix}-01`;
+    drawStudent();
+  }
 }
 $('#prevM').onclick=()=>shiftMonth('staff',-1);
 $('#nextM').onclick=()=>shiftMonth('staff',1);
 $('#todayBtn').onclick=()=>{calY=+TODAY.slice(0,4);calM=+TODAY.slice(5,7)-1;drawStaffCal()};
 $('#sPrevM').onclick=()=>shiftMonth('student',-1);
 $('#sNextM').onclick=()=>shiftMonth('student',1);
-$('#sTodayBtn').onclick=()=>{sCalY=+TODAY.slice(0,4);sCalM=+TODAY.slice(5,7)-1;drawStudent()};
+$('#sTodayBtn').onclick=()=>{sCalY=+TODAY.slice(0,4);sCalM=+TODAY.slice(5,7)-1;selectedStudentDate=TODAY;drawStudent()};
+window.matchMedia('(max-width:600px)').addEventListener('change',()=>{if(mode==='student')drawStudent()});
 
 /* 업무 연결 지도 카드 날짜칸: 타이핑하는 대로 YYYY-MM-DD 형태를 유지시켜줌 */
 document.addEventListener('input', e=>{

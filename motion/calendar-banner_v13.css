@@ -1,0 +1,84 @@
+/*!
+ * 계명대 장학금 캘린더(K-Link 학생 화면) — 상단 머리글 '사용법 안내' 영상 버튼 스타일 v13
+ * 계명대학교 장학복지팀 | 제작: 장학복지팀 추윤호
+ * 사이트에 넣는 방법은 README_v13.txt 의 '배포 방법'을 참고하세요.
+ *
+ * 위치
+ *   PC     : 남색 머리글의 '계명대 장학금 캘린더' 제목과 TODAY·TOTAL 사이 빈자리 가운데  [▶ 사용법 안내]
+ *   휴대폰 : 제목 줄 끝 — 계명 장학금 캘린더 (장학금 언제받나요?) [▶ 사용법 안내]
+ *            (휴대폰에서는 자리를 만들려고 제목의 '대'를 숨김 → 제목 글자에 class="kc-dae" 표시 필요)
+ *   태블릿(601~879px)은 머리글이 좁아 노란 ▶ 동그라미만 표시
+ * 직원용 화면(로그인 화면 포함)에서는 자동으로 숨겨집니다.
+ */
+.kc-headbtn{
+  margin-left:auto;                      /* 제목과 TODAY·TOTAL 사이 빈자리 가운데에 놓임 */
+  flex:0 0 auto; display:inline-flex; align-items:center; gap:8px;
+  height:36px; padding:0 17px 0 5px; border-radius:99px;
+  border:1px solid rgba(255,211,77,.55); background:rgba(255,255,255,.10);
+  color:#fff; font-family:inherit; font-size:14px; font-weight:800; letter-spacing:-.2px; line-height:1;
+  white-space:nowrap; cursor:pointer; -webkit-tap-highlight-color:transparent;
+  transition:background .15s, border-color .15s, transform .12s;
+}
+.kc-headbtn:hover{ background:rgba(255,255,255,.18); border-color:#ffd34d; }
+.kc-headbtn:active{ transform:scale(.96); }
+.kc-headbtn:focus-visible{ outline:3px solid #ffd34d; outline-offset:2px; }
+.kc-headbtn[aria-busy="true"]{ opacity:.7; cursor:progress; }
+
+.kc-headbtn-ic{
+  position:relative; flex:none; width:26px; height:26px; border-radius:50%;
+  background:#ffd34d; display:grid; place-items:center;
+  box-shadow:0 1px 4px rgba(0,0,0,.25);
+}
+.kc-headbtn-ic svg{ width:12px; height:12px; fill:#0f2a52; margin-left:2px; }
+.kc-headbtn-ic::after{                    /* 눈에 띄도록 은은하게 퍼지는 링 */
+  content:""; position:absolute; inset:-3px; border-radius:50%;
+  border:2px solid rgba(255,211,77,.75); pointer-events:none;
+  animation:kcHeadPulse 2.4s ease-out infinite;
+}
+@keyframes kcHeadPulse{ 0%{ transform:scale(.85); opacity:.9; } 70%,100%{ transform:scale(1.5); opacity:0; } }
+
+/* ── 태블릿(601~879px): 노란 ▶ 동그라미만.
+      버튼이 자리를 차지하지 않게(바깥 폭 0) 두고 빈자리 한가운데에 그림 → 사이트 머리글 배치·줄바꿈은 그대로 */
+@media (min-width:601px) and (max-width:879px){
+  .kc-headbtn{ position:relative; width:30px; height:30px; padding:0; margin-right:-30px; left:-15px;
+    justify-content:center; border-color:transparent; background:transparent; }
+  .kc-headbtn:hover{ background:transparent; }
+  .kc-headbtn-txt{ display:none; }
+  .kc-headbtn-ic{ width:30px; height:30px; }
+  .kc-headbtn-ic svg{ width:13px; height:13px; }
+}
+/* 601~725px: 사이트가 원래 TODAY·TOTAL을 아랫줄로 내리는 폭 → ▶는 제목 줄 오른쪽 끝에 그대로 둠 */
+@media (min-width:601px) and (max-width:725px){
+  .kc-headbtn{ margin-right:0; left:0; }
+}
+
+/* ── 휴대폰: 제목 줄 끝에 [▶ 사용법 안내] ── */
+@media (max-width:600px){
+  :root:not([data-mode="staff"]) .gnb-in #titleBlock{ flex:0 1 auto; width:auto; min-width:0; }   /* 원래 한 줄 전체(100%) → 버튼이 옆에 들어갈 수 있게 */
+  .gnb .kc-dae{ display:none; }                                    /* '계명대' → '계명' (휴대폰만) */
+  .kc-headbtn{ order:4; margin-left:0; margin-top:2px; align-self:center;
+    height:24px; padding:0 9px 0 3px; gap:5px; font-size:11px; font-weight:800; letter-spacing:-.3px;
+    border-color:rgba(255,211,77,.65); }
+  .kc-headbtn-ic{ width:18px; height:18px; box-shadow:none; }
+  .kc-headbtn-ic svg{ width:8px; height:8px; margin-left:1px; }
+  .kc-headbtn-ic::after{ inset:-2px; border-width:1.5px; }
+}
+/* 389px 이하: 한 줄에 들어가도록 제목 글자를 사이트의 360px 이하 크기(17px)와 같게 */
+@media (max-width:389px){
+  .gnb .logo .stu-title{ font-size:17px; }
+  .gnb .logo .sub{ font-size:10px; margin-left:3px; }
+}
+@media (max-width:349px){
+  .kc-headbtn{ padding-right:7px; gap:4px; font-size:10px; }
+}
+@media (max-width:329px){                 /* 아주 좁은 화면은 노란 ▶ 동그라미만 */
+  .kc-headbtn{ padding:0; border-color:transparent; background:transparent; }
+  .kc-headbtn-txt{ display:none; }
+}
+
+/* 직원용 화면에서는 숨김 (사이트가 html 에 data-mode="staff" 를 붙임) */
+:root[data-mode="staff"] .kc-headbtn{ display:none !important; }
+
+@media (prefers-reduced-motion:reduce){
+  .kc-headbtn-ic::after{ animation:none; opacity:0; }
+}

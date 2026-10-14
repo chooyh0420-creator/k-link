@@ -955,6 +955,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
   .logo .sub{font-size:10px;margin-left:3px}
 }
 </style>
+<link rel="stylesheet" href="/motion/calendar-banner_v13.css">
 </head>
 <body>
 
@@ -968,6 +969,11 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
         </span>
         <span id="titleBlock"><b>계명대 장학금 캘린더</b><span class="sub">(장학금 언제받나요?🤷‍♂️)</span></span>
       </div>
+      <!-- 학생용 '사용법 안내' 영상 버튼 (모션그래픽: /motion/ 폴더 · 직원용 화면에서는 CSS로 자동 숨김) -->
+      <button type="button" class="kc-headbtn" data-calendar-video data-calendar-target="#t-cal" aria-label="장학금 캘린더 사용법 안내 영상 보기" title="장학금 캘린더 사용법 안내 영상 (40초)">
+        <span class="kc-headbtn-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>
+        <span class="kc-headbtn-txt">사용법 안내</span>
+      </button>
       <div class="right">
         <div class="visit-pill" id="visitPill">
           <span class="vp-item"><i>TODAY</i><b id="visitToday">0</b></span>
@@ -3687,7 +3693,7 @@ function setMode(m){
   $('#staffSignOut').hidden=!(m==='staff'&&!locked);
   $('#visitPill').style.display=(m==='student')?'':'none';
   $('#titleBlock').innerHTML = (m==='student')
-    ? '<b class="stu-title">계명대 장학금 캘린더</b><span class="sub">(장학금 언제받나요?🤷‍♂️)</span>'
+    ? '<b class="stu-title">계명<span class="kc-dae">대</span> 장학금 캘린더</b><span class="sub">(장학금 언제받나요?🤷‍♂️)</span>'
     : '<b>K-Link</b><span class="sub">공동업무 연결체계</span>';
   $('#stripNote').textContent = locked ? '사번과 비밀번호로 로그인하면 열립니다.' : NOTE[m];
   $('#selfCheckLink').hidden = m!=='student';
@@ -4245,5 +4251,6 @@ restoreStaffSession();
   }
 })();
 </script>
+<script src="/motion/calendar-launcher_v13.js" defer></script>
 </body>
 </html>

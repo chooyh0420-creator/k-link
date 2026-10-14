@@ -1,17 +1,17 @@
 /*!
- * 계명대 장학금 캘린더(K-Link 학생 화면) — 상단 머리글 '사용법 안내' 영상 버튼 스타일 v13
+ * 계명대 장학금 캘린더(K-Link 학생 화면) — 상단 머리글 '사용법 안내' 영상 버튼 스타일 v14
  * 계명대학교 장학복지팀 | 제작: 장학복지팀 추윤호
- * 사이트에 넣는 방법은 README_v13.txt 의 '배포 방법'을 참고하세요.
+ * 사이트에 넣는 방법은 README_v14.txt 의 '배포 방법'을 참고하세요.
  *
  * 위치
- *   PC     : 남색 머리글의 '계명대 장학금 캘린더' 제목과 TODAY·TOTAL 사이 빈자리 가운데  [▶ 사용법 안내]
+ *   PC     : 남색 머리글의 '계명대 장학금 캘린더 (장학금 언제받나요?)' 제목 바로 오른쪽  [▶ 사용법 안내]
  *   휴대폰 : 제목 줄 끝 — 계명 장학금 캘린더 (장학금 언제받나요?) [▶ 사용법 안내]
  *            (휴대폰에서는 자리를 만들려고 제목의 '대'를 숨김 → 제목 글자에 class="kc-dae" 표시 필요)
  *   태블릿(601~879px)은 머리글이 좁아 노란 ▶ 동그라미만 표시
  * 직원용 화면(로그인 화면 포함)에서는 자동으로 숨겨집니다.
  */
 .kc-headbtn{
-  margin-left:auto;                      /* 제목과 TODAY·TOTAL 사이 빈자리 가운데에 놓임 */
+  margin-left:0;                         /* v14: 제목 바로 오른쪽에 붙임 (TODAY·TOTAL은 원래대로 오른쪽 끝) */
   flex:0 0 auto; display:inline-flex; align-items:center; gap:8px;
   height:36px; padding:0 17px 0 5px; border-radius:99px;
   border:1px solid rgba(255,211,77,.55); background:rgba(255,255,255,.10);
@@ -37,17 +37,17 @@
 }
 @keyframes kcHeadPulse{ 0%{ transform:scale(.85); opacity:.9; } 70%,100%{ transform:scale(1.5); opacity:0; } }
 
-/* ── 태블릿(601~879px): 노란 ▶ 동그라미만.
-      버튼이 자리를 차지하지 않게(바깥 폭 0) 두고 빈자리 한가운데에 그림 → 사이트 머리글 배치·줄바꿈은 그대로 */
+/* ── 태블릿(601~879px): 노란 ▶ 동그라미만 (제목 바로 오른쪽).
+      버튼이 자리를 차지하지 않게(바깥 폭 0) 두어 사이트 머리글 배치·줄바꿈은 그대로 */
 @media (min-width:601px) and (max-width:879px){
-  .kc-headbtn{ position:relative; width:30px; height:30px; padding:0; margin-right:-30px; left:-15px;
+  .kc-headbtn{ position:relative; width:30px; height:30px; padding:0; margin-right:-30px; left:0;
     justify-content:center; border-color:transparent; background:transparent; }
   .kc-headbtn:hover{ background:transparent; }
   .kc-headbtn-txt{ display:none; }
   .kc-headbtn-ic{ width:30px; height:30px; }
   .kc-headbtn-ic svg{ width:13px; height:13px; }
 }
-/* 601~725px: 사이트가 원래 TODAY·TOTAL을 아랫줄로 내리는 폭 → ▶는 제목 줄 오른쪽 끝에 그대로 둠 */
+/* 601~725px: 사이트가 원래 TODAY·TOTAL을 아랫줄로 내리는 폭 → ▶는 보통 배치로 제목 바로 오른쪽 */
 @media (min-width:601px) and (max-width:725px){
   .kc-headbtn{ margin-right:0; left:0; }
 }

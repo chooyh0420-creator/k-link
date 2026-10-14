@@ -1,16 +1,16 @@
 /*!
  * 계명대 장학금 캘린더 소개 영상 런처 (약 2KB) — 계명대학교 장학복지팀
  * 페이지에는 이 파일만 미리 넣어 둡니다. data-calendar-video 속성이 있는 버튼을 누르는 순간에만
- * calendar-video_v13.css / calendar-video_v13.js / 배경음악(mp3)을 불러오므로 평소 페이지 속도에는 영향이 없습니다.
+ * calendar-video_v14.css / calendar-video_v14.js / 배경음악(mp3)을 불러오므로 평소 페이지 속도에는 영향이 없습니다.
  *
  * 사용법:
- *   <script src="/motion/calendar-launcher_v13.js" defer></script>
+ *   <script src="/motion/calendar-launcher_v14.js" defer></script>
  *   <button type="button" class="kc-open-btn" data-calendar-video data-calendar-target="#t-cal">▶ 영상으로 보기</button>
  */
 (function () {
   'use strict';
-  var VER = '13';
-  var DEFAULT_MUSIC = 'calendar-bgm_v13.mp3';
+  var VER = '14';
+  var DEFAULT_MUSIC = 'calendar-bgm_v14.mp3';
   var DEFAULT_CREDIT = 'Music: “Life of Riley” Kevin MacLeod (incompetech.com) · CC BY 4.0';
   var me = document.currentScript;
   var BASE = me && me.src ? me.src.replace(/[^\/]*(\?.*)?$/, '') : '';
@@ -25,11 +25,11 @@
       var bad = function () { loading = null; reject(new Error('calendar-video load failed')); };
       var link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = BASE + 'calendar-video_v13.css?v=' + VER;
+      link.href = BASE + 'calendar-video_v14.css?v=' + VER;
       link.onload = ok; link.onerror = bad;
       document.head.appendChild(link);
       var s = document.createElement('script');
-      s.src = BASE + 'calendar-video_v13.js?v=' + VER;
+      s.src = BASE + 'calendar-video_v14.js?v=' + VER;
       s.onload = ok; s.onerror = bad;
       document.head.appendChild(s);
     });

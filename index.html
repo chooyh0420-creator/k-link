@@ -3012,10 +3012,62 @@ function openEvent(id){
       <dt>문의</dt><dd>${esc(e.where)}</dd></dl>
     <div class="note">${e.desc?publicDescriptionHtml(e.desc):'등록된 안내 문구가 없습니다.'}</div>
     ${shortcutUrl?`<a href="${esc(shortcutUrl)}" target="_blank" rel="noopener" class="btn btn-sm"
-      style="display:inline-block;margin-top:14px;text-decoration:none">바로가기 ↗</a>`:''}`;
+      style="display:inline-block;margin-top:14px;text-decoration:none">바로가기 ↗</a>`:''}${eventEditHtml(e)}`;
   $('#drawer').hidden=false;$('#scrim').hidden=false;$('#drClose').focus();
 }
 function closeDrawer(){$('#drawer').hidden=true;$('#scrim').hidden=true}
+/* 직원용에서 지급일 업로드 일정을 눌렀을 때: 상세 아래에 수정 폼(일정명·구분·기간·문의·링크·안내 문구)을 보여줍니다. */
+function eventEditHtml(e){
+  if(!(typeof mode!=='undefined' && mode==='staff' && hasStaffSession()) || !S_EVENTS.some(function(x){return x.id===e.id})) return '';
+  return '<div class="dr-sec"><h4>일정 정보 수정</h4>'
+   +'<div class="field"><label for="evName">일정명</label><input type="text" id="evName" value="'+esc(e.name)+'"></div>'
+   +'<div class="row2"><div class="field"><label for="evKind">구분</label><select id="evKind">'+S_KIND.map(function(k){return '<option value="'+k.id+'"'+(k.id===e.kind?' selected':'')+'>'+esc(k.name)+'</option>';}).join('')+'</select></div>'
+   +'<div class="field"><label for="evWhere">문의</label><input type="text" id="evWhere" value="'+esc(e.where||'')+'"></div></div>'
+   +'<div class="row2"><div class="field"><label for="evStart">시작일</label><input type="date" id="evStart" value="'+esc(e.start)+'"></div>'
+   +'<div class="field"><label for="evEnd">종료일 (선택)</label><input type="date" id="evEnd" value="'+(e.end&&e.end!==e.start?esc(e.end):'')+'"></div></div>'
+   +'<div class="field"><label for="evUrl">바로가기 링크</label><input type="url" id="evUrl" value="'+esc(e.url||'')+'" placeholder="https://"></div>'
+   +'<div class="field"><label for="evDesc">안내 문구</label><div class="rich-tools"><button class="btn ghost btn-sm" type="button" data-add-link="evDesc" onmousedown="event.preventDefault()">링크 삽입</button><small style="color:var(--ink-3)">글자를 블록지정 한 뒤 주소를 연결하세요.</small></div>'
+   +'<div id="evDesc" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="학생에게 보여줄 설명 (선택)">'+editorHtmlFromText(e.desc||'')+'</div></div>'
+   +'<button class="btn btn-sm" id="evSave" data-ev="'+esc(e.id)+'">일정 정보 저장</button></div>'
+   +'<div class="dr-sec"><h4>일정 숨기기</h4><p style="color:var(--ink-3);font-size:12px;margin:0 0 10px">학생용·직원용 캘린더에서 이 일정을 숨깁니다. (지급일 업로드 화면에서 복구할 수 있습니다)</p>'
+   +'<button class="btn ghost danger btn-sm" id="evHide" data-ev="'+esc(e.id)+'">이 일정 숨기기</button></div>';
+}
+async function cloudUpdateEventFull(e){
+  if(!sb || !hasStaffSession()) return false;
+  try{
+    const r=eventToRow(e); delete r.id;
+    const {data,error}=await sb.from('klink_student_events').update(r).eq('id',e.id).select('id').maybeSingle();
+    if(error) throw error; return !!data;
+  }catch(err){ console.warn('클라우드 저장 실패(일정 수정):', err); return false; }
+}
+document.addEventListener('click', async function(ev){
+  const tg=ev.target; if(!tg||!tg.id) return;
+  if(tg.id==='evSave'){
+    const e=sById(tg.dataset.ev); if(!e||!S_EVENTS.includes(e)) return;
+    const name=$('#evName').value.trim();
+    if(!name){ toast('일정명을 입력해주세요.'); $('#evName').focus(); return; }
+    const start=$('#evStart').value;
+    if(!isValidISODate(start)){ toast('올바른 시작일을 입력해주세요.'); $('#evStart').focus(); return; }
+    const end=$('#evEnd').value||start;
+    if(!isValidISODate(end)||end<start){ toast('종료일은 시작일 이후의 올바른 날짜로 입력해주세요.'); $('#evEnd').focus(); return; }
+    const rawUrl=$('#evUrl').value.trim(), safeUrl=safeHttpUrl(rawUrl);
+    if(rawUrl&&!safeUrl){ toast('바로가기 주소는 http:// 또는 https:// 주소만 입력할 수 있습니다.'); $('#evUrl').focus(); return; }
+    const next=Object.assign({},e,{name:name,kind:$('#evKind').value,where:$('#evWhere').value.trim(),start:start,end:end,url:safeUrl||'',desc:sanitizeRichHtml($('#evDesc').innerHTML)});
+    tg.disabled=true;
+    const ok=await cloudUpdateEventFull(next);
+    tg.disabled=false;
+    if(!ok){ toast('저장에 실패했습니다. 로그인 상태와 인터넷 연결을 확인해주세요.'); return; }
+    Object.assign(e,next);
+    await markPayUpdated();
+    drawStaff(); drawStudent(); openEvent(e.id);
+    toast('일정 정보를 저장했습니다.');
+    return;
+  }
+  if(tg.id==='evHide'){
+    const id=tg.dataset.ev; closeDrawer(); deleteImportedEvent(id); drawStaff();
+  }
+});
+
 
 /* ===== 산출물 내보내기 — 「업무별 표준기준표」(11월 산출물) ===== */
 function buildCsv(){

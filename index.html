@@ -423,13 +423,18 @@ main{padding:20px; max-width:1540px; margin:0 auto}
 .hint-track{display:inline-block; white-space:nowrap; animation-name:hint-scroll; animation-timing-function:linear; animation-iteration-count:infinite}
 .hint:hover .hint-track{animation-play-state:paused}
 @keyframes hint-scroll{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
-.dow{display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid var(--line); background:var(--surface-2)}
+.dow{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,.45fr) minmax(0,.45fr); border-bottom:1px solid var(--line); background:var(--surface-2)}
 .dow div{padding:9px 0; text-align:center; font-size:12px; font-weight:700; color:var(--ink-3)}
-.dow div:first-child{color:var(--s-late)}
-.dow div:last-child{color:var(--s-prog)}
+.dow div:nth-child(6){color:var(--s-prog)}
+.dow div:nth-child(7){color:var(--s-late)}
+.dow div:nth-child(n+6){font-size:11px}
+.wk-nums .dnum:nth-child(n+6){font-size:11px; padding:8px 4px 4px; text-align:center}
+.wk-grid button:nth-child(n+6){background:color-mix(in srgb,var(--line-soft) 35%,transparent)}
+.wk-grid button.istoday:nth-child(n+6){background:var(--brand-soft)}
+.wk-bars .bar{min-width:0}
 .week{position:relative; border-bottom:1px solid var(--line-soft); min-height:118px}
 .week:last-child{border-bottom:0}
-.wk-grid{position:absolute; inset:0; display:grid; grid-template-columns:repeat(7,1fr)}
+.wk-grid{position:absolute; inset:0; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,.45fr) minmax(0,.45fr)}
 .wk-grid button{border:0; border-right:1px solid var(--line-soft); background:transparent; padding:0;
   position:relative; user-select:none}
 .wk-grid button[data-newday]{cursor:pointer; touch-action:none}
@@ -446,14 +451,14 @@ main{padding:20px; max-width:1540px; margin:0 auto}
   font-size:11px; font-weight:700; color:var(--brand);
   background:var(--surface); border:1px solid var(--brand); border-radius:5px; padding:2px 8px}
 .wk-grid button:focus-visible{outline:2px solid var(--brand); outline-offset:-2px}
-.wk-nums{position:relative; display:grid; grid-template-columns:repeat(7,1fr); pointer-events:none}
+.wk-nums{position:relative; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,.45fr) minmax(0,.45fr); pointer-events:none}
 .dnum{padding:8px 10px 4px; font-size:13.5px; font-variant-numeric:tabular-nums; color:var(--ink-2); font-weight:500}
 .dnum.off{color:var(--ink-3); opacity:.5}
 .dnum.sun{color:var(--s-late)} .dnum.sat{color:var(--s-prog)}
 .dnum .badge{display:inline-flex; align-items:center; justify-content:center;
   min-width:24px; height:24px; border-radius:99px; background:var(--brand); color:var(--brand-on);
   font-weight:700; padding:0 7px; margin:-4px 0 0 -4px}
-.wk-bars{position:relative; display:grid; grid-template-columns:repeat(7,1fr);
+.wk-bars{position:relative; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,.45fr) minmax(0,.45fr);
   row-gap:4px; padding:2px 5px 8px; pointer-events:none}
 #sCalBody .wk-bars{padding-left:0;padding-right:0}
 #sCalBody .wk-bars .bar{margin-left:2px;margin-right:2px}
@@ -1057,7 +1062,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
           <div class="legend" id="calLegend"></div>
         </div>
         <div class="hint">날짜를 누르거나 <b>여러 날을 드래그</b>하면 그 기간으로 업무를 추가할 수 있습니다. 색 막대를 누르면 상세가 열립니다.</div>
-        <div class="dow"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+        <div class="dow"><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div><div>일</div></div>
         <div id="calBody"></div>
       </div>
       <div class="card box upnext">
@@ -1286,7 +1291,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)
       </div>
       <div class="cf-no-events" id="cfNoEvents" role="status" hidden>현재 등록된 장학 일정이 없어요😧</div>
       <div class="hint" id="sHintBox"><span class="hint-track" id="sHintTrack"></span></div>
-      <div class="dow"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+      <div class="dow"><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div><div>일</div></div>
       <div id="sCalBody"></div>
     </div>
     <div class="card box upnext">
@@ -2060,7 +2065,7 @@ function dleftChip(iso){
 
 /* ===== 달력 엔진 ===== */
 function monthMatrix(y,m){
-  const first=new Date(y,m,1), off=first.getDay();
+  const first=new Date(y,m,1), off=(first.getDay()+6)%7; /* 월요일 시작 */
   const start=new Date(y,m,1-off), weeks=[];
   for(let w=0;w<6;w++){
     const days=[];

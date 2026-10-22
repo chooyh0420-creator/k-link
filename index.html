@@ -2134,6 +2134,15 @@ try{ calShowPublic = localStorage.getItem('klink_cal_show_public')==='1'; }catch
 const staffEvents=()=>{
   const list=TASKS.filter(t=>t.calendarEnabled!==false && (calShowPublic || !t.isPublic)).map(t=>({id:t.id,name:`(${dept(t.dept).name}) ${t.name}`,
     start:t.date,end:t.end||t.date,color:dept(t.dept).color,src:'task'}));
+  /* 지급일 업로드로 들어간 학생용 일정도 직원용에서 함께 보여줍니다('학생 공개 항목 표시'를 켠 경우).
+     보기 전용이며 눌러서 상세만 열립니다. 같은 이름·기간의 '학생 공개 업무'가 이미 있으면 중복 표시하지 않습니다. */
+  if(calShowPublic){
+    const pubKeys=new Set(TASKS.filter(t=>t.isPublic).map(t=>dedupBaseName((t.publicLabel&&t.publicLabel.trim())||t.name)+'|'+t.date+'|'+(t.end||t.date)));
+    dedupEvents(S_EVENTS.filter(e=>!HIDDEN_IDS.has(e.id)))
+      .filter(e=>!pubKeys.has(dedupBaseName(e.name)+'|'+e.start+'|'+e.end))
+      .forEach(e=>list.push({id:e.id,name:'(학생용) '+e.name,start:e.start,end:e.end,
+        color:NEW_IMPORT_IDS.has(e.id)?'#2563EB':kind(e.kind).color,src:'sev',kind:e.kind}));
+  }
   if(DRAFT){
     list.push({id:'__draft', name:DRAFT.name.trim()||'(제목 없음)',
       start:DRAFT.start, end:DRAFT.end, color:'var(--brand)', src:'draft', draft:true});

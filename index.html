@@ -2775,7 +2775,7 @@ attachDrag($('#calBody'), (a,b)=>{
 attachStaffTaskDrag($('#calBody'));
 const STUDENT_MIN_YEAR=2026, STUDENT_MIN_MONTH=2;
 const studentMonthBeforeMin=(year,month)=>year<STUDENT_MIN_YEAR||(year===STUDENT_MIN_YEAR&&month<STUDENT_MIN_MONTH);
-let sCalY=+TODAY.slice(0,4), sCalM=+TODAY.slice(5,7)-1, sFilter='all', sPastOpen=false, selectedStudentDate=TODAY;
+let sCalY=+TODAY.slice(0,4), sCalM=+TODAY.slice(5,7)-1, sFilter='all', sPastOpen=false, selectedStudentDate=null; /* 모바일: 날짜를 누르기 전에는 하단 일정 패널을 열지 않음 */
 let sSeq=100;
 /* 직원용에서 '학생 공개'를 켠 업무를 학생 공개용 사본으로 변환합니다.
    학생 화면은 이 사본만 읽으며, 업무 원문(staff_data)은 받지 않습니다. */
@@ -4140,7 +4140,7 @@ $('#nextM').onclick=()=>shiftMonth('staff',1);
 $('#todayBtn').onclick=()=>{calY=+TODAY.slice(0,4);calM=+TODAY.slice(5,7)-1;drawStaffCal()};
 $('#sPrevM').onclick=()=>shiftMonth('student',-1);
 $('#sNextM').onclick=()=>shiftMonth('student',1);
-$('#sTodayBtn').onclick=()=>{sCalY=+TODAY.slice(0,4);sCalM=+TODAY.slice(5,7)-1;if(studentMonthBeforeMin(sCalY,sCalM)){sCalY=STUDENT_MIN_YEAR;sCalM=STUDENT_MIN_MONTH;selectedStudentDate=null}else selectedStudentDate=TODAY;drawStudent()};
+$('#sTodayBtn').onclick=()=>{sCalY=+TODAY.slice(0,4);sCalM=+TODAY.slice(5,7)-1;if(studentMonthBeforeMin(sCalY,sCalM)){sCalY=STUDENT_MIN_YEAR;sCalM=STUDENT_MIN_MONTH;selectedStudentDate=null}else selectedStudentDate=null;drawStudent()};
 window.matchMedia('(max-width:600px)').addEventListener('change',()=>{if(mode==='student')drawStudent()});
 
 /* 업무 연결 지도 카드 날짜칸: 타이핑하는 대로 YYYY-MM-DD 형태를 유지시켜줌 */
